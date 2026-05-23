@@ -7,7 +7,7 @@
 //
 // Sacred rules honoured:
 // - DISCORD_BOT_TOKEN: env-only, never logged in full
-// - SUPABASE_SERVICE_KEY: env-only, bypasses RLS so mc_missions inserts
+// - SUPABASE_SERVICE_ROLE_KEY: env-only, bypasses RLS so mc_missions inserts
 //   land even though the server has no Supabase Auth session
 // - CORS: locked to MC origins only (dev + configured prod)
 // - Rate limit: 1 DM per user per 24h, enforced via mc_missions
@@ -24,7 +24,7 @@ dotenv.config({ path: '.env.local' })
 dotenv.config() // fall back to .env
 
 // ── Required env (fail fast) ──────────────────────────────────────────
-const required = ['DISCORD_BOT_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']
+const required = ['DISCORD_BOT_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
 const missing = required.filter((k) => !process.env[k])
 if (missing.length > 0) {
   console.error(`⚠️  Missing required env: ${missing.join(', ')}`)
@@ -38,8 +38,8 @@ const RATE_LIMIT_MS = 24 * 60 * 60 * 1000
 
 // ── Supabase (service-role; server-only, bypasses RLS) ────────────────
 const supabase =
-  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
-    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
         auth: { persistSession: false },
       })
     : null
