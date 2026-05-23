@@ -20,6 +20,16 @@ export default defineConfig({
   },
   server: {
     port: 5174, // distinct from the shop's default 5173 so both can run side-by-side
+    proxy: {
+      // Forward /api/* to the local Express service (server/index.js).
+      // Lets the React app call `/api/send-dm` in dev without a separate
+      // base URL, and matches how prod is wired (Express in front of the
+      // SPA via reverse proxy). Run both with `npm run dev:full`.
+      '/api': {
+        target: `http://localhost:${process.env.API_PORT || 3011}`,
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     globals: true,
