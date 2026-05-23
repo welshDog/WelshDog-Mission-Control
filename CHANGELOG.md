@@ -4,6 +4,67 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.4.0] — 2026-05-23
+
+### Added — **Catch Stragglers, live end-to-end**
+Third Agent Action shipped. The "one button per commit" cadence continues —
+this one is rich enough to need its own panel, so we ship a full-screen
+overlay plus a tiny Express service for the Discord delivery leg.
+
+- **`server/index.js`** — first Express route lands: `POST /api/send-dm`.
+  Opens a Discord DM channel via the bot REST API (`DISCORD_BOT_TOKEN`
+  stays server-only) + sends the message. Falls back to `channel:
+  email_logged` if `discord_id` is missing. 24h-per-user rate limit
+  enforced via `mc_missions` (signal_source `catch_stragglers:dm_sent:<userId>`).
+  Discord 429s are surfaced with `retryAfter` so the UI can backoff.
+  Every send writes a shipped-lane audit row to `mc_missions` (full
+  message + tone + channel in `notes`, visible on the Kanban). Service
+  role key is used server-only to bypass RLS for that insert. Adds
+  `GET /api/health` for diagnostics. CORS locked to `API_CORS_ORIGINS`.
+- **`vite.config.js`** — dev proxy `/api/*` → `http://localhost:${API_PORT|3011}`
+  so the SPA hits `/api/send-dm` with no separate base URL (mirrors
+  the prod reverse-proxy pattern). Pair with `npm run dev:full`.
+- **`src/components/mission/CatchStragglers.jsx`** — full-screen glass
+  overlay. Esc-to-close, backdrop-click-to-close. Scan button hits
+  `fetchStragglerDrafts()`; per-row tone picker (warm / curious /
+  terse), editable textarea, snooze 24h, skip, send. Bulk "Approve all"
+  for hyperfocus pacing. Row-level error surface for rate-limit /
+  delivery failures (clears on tone change). Empty/loading/no-channel
+  states all explicit.
+- **`src/lib/supabase.js`** —
+  - `fetchStragglerDrafts({ idleDays, limit })`: probes `user_xp` for
+    idle students, decorates with `users` + `lesson_progress`, returns
+    `{ drafts, total, skipped }` with three tone-tagged DM variants
+    pre-baked per student. Defensive — each probe failure becomes a
+    `skipped` string, never a crash.
+  - `snoozeStraggler(userId)`: writes a `catch_stragglers:snoozed:<id>`
+    audit row (UI-local list filtering — we don't auto-filter on the
+    next scan; that would make the operator's mental model wobble).
+  - `sendStragglerDM(payload)`: thin POST wrapper over `/api/send-dm`.
+- **`src/components/mission/AgentActions.jsx`** — Catch Stragglers tile
+  flipped to `enabled: true`; live count updated from `2 / 6` to
+  `3 / 6`. Clicking the tile opens the overlay (the inline result
+  modal handles the lighter Pulse/Brief actions).
+- **`.env.example`** — `API_PORT`, `API_CORS_ORIGINS`, `DISCORD_BOT_TOKEN`,
+  `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` documented with their why.
+
+### Sacred-rules honoured
+- `DISCORD_BOT_TOKEN` + `SUPABASE_SERVICE_KEY`: env-only, no `VITE_`
+  prefix → never reachable from the browser.
+- Schema source of truth is **MC's** `mc_missions` migration. The
+  course repo's dead `api/routes/catch_stragglers.py` wrote to phantom
+  columns (`mission_type`, `user_id`, `status`, `metadata`) — ignored
+  on purpose; we didn't revive that dead branch.
+- Course Python files were **not** touched.
+
+### Known follow-ups (not blockers)
+- `tests/setup.js` referenced by `vite.config.js` doesn't exist yet —
+  unit tests for Catch Stragglers land when the setup is bootstrapped.
+- Email fallback channel currently logs only (`email_logged`); real
+  send wires when SMTP is picked.
+- `MissionControl.jsx:119` has a pre-existing `react/no-unescaped-entities`
+  lint warning (`don't` → `don&apos;t`). Unrelated to this commit.
+
 ## [0.3.0] — 2026-05-23
 
 ### Changed — **pivot to course-ops, drop the shop entirely**

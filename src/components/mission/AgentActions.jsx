@@ -2,29 +2,44 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Stethoscope, Sunrise, UserCheck, Coins, Undo2, ScanSearch, Loader, X } from 'lucide-react'
 import { runHealthPulse, runMorningBrief } from '../../lib/supabase'
+import CatchStragglers from './CatchStragglers'
 
 // The "do behind the scenes" panel. Each button represents an admin agent
-// action — most are placeholders this commit; we ship two REAL ones
-// (Health Pulse + Morning Brief) end-to-end so the wiring is proven and
-// the others slot in commit-by-commit.
+// action — most are placeholders this commit; we ship THREE real ones now
+// (Health Pulse + Morning Brief + Catch Stragglers). The first two render
+// their result in the inline modal; Catch Stragglers opens a full-screen
+// overlay because the operator UX is rich (tone picker, editable drafts,
+// bulk approve, snooze). The others slot in commit-by-commit.
 //
 // ADHD pacing: one button per commit. Each ships a real working thing.
 
 const ACTIONS = [
-  { id: 'pulse',      label: 'Health Pulse',     Icon: Stethoscope, desc: 'Scan course signals → auto-create missions',           enabled: true  },
-  { id: 'brief',      label: 'Morning Brief',    Icon: Sunrise,     desc: '60-second summary of the last 24h',                    enabled: true  },
-  { id: 'stragglers', label: 'Catch Stragglers', Icon: UserCheck,   desc: 'Find idle students · draft DMs you approve · send',     enabled: false },
+  { id: 'pulse',      label: 'Health Pulse',     Icon: Stethoscope, desc: 'Scan course signals → auto-create missions',            enabled: true  },
+  { id: 'brief',      label: 'Morning Brief',    Icon: Sunrise,     desc: '60-second summary of the last 24h',                     enabled: true  },
+  { id: 'stragglers', label: 'Catch Stragglers', Icon: UserCheck,   desc: 'Find idle students · draft DMs you approve · send',     enabled: true  },
   { id: 'grant',      label: 'Grant Tokens',     Icon: Coins,       desc: 'Pick user + amount + reason → award_tokens() w/ audit', enabled: false },
   { id: 'refund',     label: 'Refund',           Icon: Undo2,       desc: 'Stripe + token refund in one click (reversible)',       enabled: false },
   { id: 'drift',      label: 'Drift Scan',       Icon: ScanSearch,  desc: 'Re-run quiz true/false positional scan',                 enabled: false },
 ]
 
+const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
+
 export default function AgentActions() {
-  const [busy, setBusy]       = useState(null)         // action id currently running
-  const [result, setResult]   = useState(null)         // { id, payload }
-  const [error, setError]     = useState(null)
+  const [busy, setBusy]               = useState(null)  // action id currently running
+  const [result, setResult]           = useState(null)  // { id, payload }
+  const [error, setError]             = useState(null)
+  const [showStragglers, setShowStr]  = useState(false) // overlay visibility
 
   const run = async (id) => {
+    // Catch Stragglers is rich enough to need its own panel — open the
+    // overlay instead of running inline. The audit row is written by the
+    // Send action inside the overlay (server/index.js), so we don't
+    // double-log here.
+    if (id === 'stragglers') {
+      setShowStr(true)
+      return
+    }
+
     setBusy(id); setError(null); setResult(null)
     try {
       if (id === 'pulse') {
@@ -44,7 +59,7 @@ export default function AgentActions() {
     <section className="glass-panel rounded-2xl p-6 border border-white/10">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold">Agent Actions</h2>
-        <span className="text-[10px] text-gray-500 font-mono">2 / {ACTIONS.length} live</span>
+        <span className="text-[10px] text-gray-500 font-mono">{LIVE_COUNT} / {ACTIONS.length} live</span>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -151,6 +166,9 @@ export default function AgentActions() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Catch Stragglers — full-screen overlay (its own AnimatePresence) */}
+      {showStragglers && <CatchStragglers onClose={() => setShowStr(false)} />}
     </section>
   )
 }

@@ -129,6 +129,141 @@ export const runHealthPulse = async () => {
   return { createdCount, scanned, skipped }
 }
 
+// 🎯 Catch Stragglers — read+draft phase. Fetch idle students from
+// `user_xp`, decorate with profile + last-completed lesson, hand back
+// three tone-tagged DM variants per student so the operator can pick.
+//
+// Read-only against course tables. The actual DM SEND lives in
+// server/index.js (POST /api/send-dm) so DISCORD_BOT_TOKEN stays out of
+// the browser. Returns { drafts, total, skipped } — `skipped` carries
+// any per-signal probe errors so the UI can render a clean diagnostic.
+const dmVariants = (name, stuckModule) => [
+  {
+    tone: 'warm',
+    text: `Hey ${name} 👋 We noticed you haven't been around lately. Totally get it — life gets busy! Whenever you're ready, ${stuckModule} is waiting for you. No rush. 🐶♾️`,
+  },
+  {
+    tone: 'curious',
+    text: `Hey ${name} — just checking in! Got stuck on ${stuckModule}? Drop a message and we'll help you unstick. You're closer than you think. 🚀`,
+  },
+  {
+    tone: 'terse',
+    text: `Hey ${name}. Still there? ${stuckModule} is ready when you are. 💪`,
+  },
+]
+
+export const fetchStragglerDrafts = async ({ idleDays = 7, limit = 20 } = {}) => {
+  const skipped = []
+  const cutoff = new Date(Date.now() - idleDays * 24 * 60 * 60 * 1000).toISOString()
+
+  // 1. Idle students (last_active older than cutoff).
+  const { data: idle, error: idleErr } = await supabase
+    .from('user_xp')
+    .select('user_id, level, total_xp, last_active')
+    .lt('last_active', cutoff)
+    .order('last_active', { ascending: true })
+    .limit(limit)
+  if (idleErr) {
+    return { drafts: [], total: 0, skipped: [`user_xp (${idleErr.message})`] }
+  }
+  if (!idle || idle.length === 0) return { drafts: [], total: 0, skipped }
+
+  const userIds = idle.map((r) => r.user_id)
+
+  // 2. Profile decoration. Defensive — a missing `users` row just means
+  //    we fall back to "Student" / no discordId.
+  const profileMap = new Map()
+  try {
+    const { data: profiles, error } = await supabase
+      .from('users')
+      .select('id, full_name, email, discord_id')
+      .in('id', userIds)
+    if (error) throw error
+    for (const p of profiles || []) profileMap.set(p.id, p)
+  } catch (e) {
+    skipped.push(`users (${e?.message || 'profile probe failed'})`)
+  }
+
+  // 3. Last completed lesson per user (for the "stuck on" hint).
+  const lastLessonMap = new Map()
+  try {
+    const { data: progress, error } = await supabase
+      .from('lesson_progress')
+      .select('user_id, lesson_id, completed_at')
+      .in('user_id', userIds)
+      .eq('completed', true)
+      .order('completed_at', { ascending: false })
+    if (error) throw error
+    for (const row of progress || []) {
+      if (!lastLessonMap.has(row.user_id)) lastLessonMap.set(row.user_id, row.lesson_id)
+    }
+  } catch (e) {
+    skipped.push(`lesson_progress (${e?.message || 'progress probe failed'})`)
+  }
+
+  const drafts = idle.map((row) => {
+    const profile = profileMap.get(row.user_id) || {}
+    const name = profile.full_name || 'Student'
+    const stuckModule = lastLessonMap.get(row.user_id) || 'their last module'
+    const lastActive = row.last_active || null
+
+    let daysIdle = '?'
+    if (lastActive) {
+      const ms = Date.now() - new Date(lastActive).getTime()
+      if (!Number.isNaN(ms)) daysIdle = Math.max(0, Math.floor(ms / 86400000))
+    }
+
+    return {
+      userId: row.user_id,
+      name,
+      email: profile.email || '',
+      discordId: profile.discord_id || null,
+      level: row.level ?? 1,
+      totalXp: row.total_xp ?? 0,
+      lastActive,
+      daysIdle,
+      stuckModule,
+      dmVariants: dmVariants(name, stuckModule),
+    }
+  })
+
+  return { drafts, total: drafts.length, skipped }
+}
+
+// 🎯 Catch Stragglers — snooze. Logs an audit row so the Kanban can see
+// "Lyndz parked this one" without blocking re-fetching. UI handles the
+// per-session skip; we don't auto-filter on next scan (that would make
+// the scan behaviour surprising).
+export const snoozeStraggler = async (userId, hours = 24) => {
+  const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+  const { error } = await supabase.from('mc_missions').insert([
+    {
+      title: `Straggler snoozed · ${userId.slice(0, 8)}…`,
+      signal_source: `catch_stragglers:snoozed:${userId}`,
+      lane: 'detected',
+      notes: `Snoozed until ${until} by operator (24h cool-down on the UI list).`,
+    },
+  ])
+  if (error) {
+    console.error('snoozeStraggler audit insert failed:', error)
+    throw error
+  }
+  return { ok: true, until }
+}
+
+// 🎯 Catch Stragglers — send a DM via the MC API (server/index.js).
+// Returns the server's response shape directly so the UI can branch on
+// rate-limit / no-channel without re-parsing.
+export const sendStragglerDM = async ({ userId, discordId, email, message, tone }) => {
+  const res = await fetch('/api/send-dm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, discordId, email, message, tone }),
+  })
+  const payload = await res.json().catch(() => ({}))
+  return { status: res.status, ...payload }
+}
+
 // ☀️ Morning Brief — last-24h aggregate. Returns a plain object so the UI
 // can render it as a modal without leaking column-name assumptions.
 export const runMorningBrief = async () => {
