@@ -23,12 +23,21 @@ import { createClient } from '@supabase/supabase-js'
 dotenv.config({ path: '.env.local' })
 dotenv.config() // fall back to .env
 
+// ── Discord token (accept ecosystem-standard name OR the short form
+//    the broski Discord bot uses; either lands here). ────────────────
+const DISCORD_BOT_TOKEN = DISCORD_BOT_TOKEN || process.env.DISCORD_TOKEN
+
 // ── Required env (fail fast) ──────────────────────────────────────────
-const required = ['DISCORD_BOT_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
-const missing = required.filter((k) => !process.env[k])
+const required = {
+  DISCORD_BOT_TOKEN: DISCORD_BOT_TOKEN,
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+}
+const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => k)
 if (missing.length > 0) {
   console.error(`⚠️  Missing required env: ${missing.join(', ')}`)
   console.error('   Server cannot send DMs. Add them to .env.local and restart.')
+  console.error('   Note: DISCORD_BOT_TOKEN is also accepted as DISCORD_TOKEN.')
   // We still boot so /api/health works for diagnostic; /api/send-dm will 500.
 }
 
@@ -77,7 +86,7 @@ app.use((req, _res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    discordTokenPresent: Boolean(process.env.DISCORD_BOT_TOKEN),
+    discordTokenPresent: Boolean(DISCORD_BOT_TOKEN),
     supabaseConfigured: Boolean(supabase),
     rateLimitHours: RATE_LIMIT_MS / 3600000,
   })
@@ -96,7 +105,7 @@ app.post('/api/send-dm', async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ success: false, userId, error: 'supabase not configured' })
   }
-  if (!process.env.DISCORD_BOT_TOKEN) {
+  if (!DISCORD_BOT_TOKEN) {
     return res.status(500).json({ success: false, userId, error: 'discord token missing' })
   }
 
@@ -130,7 +139,7 @@ app.post('/api/send-dm', async (req, res) => {
       const openRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
         method: 'POST',
         headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ recipient_id: discordId }),
@@ -142,7 +151,7 @@ app.post('/api/send-dm', async (req, res) => {
         const sendRes = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
           method: 'POST',
           headers: {
-            Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+            Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ content: message }),
