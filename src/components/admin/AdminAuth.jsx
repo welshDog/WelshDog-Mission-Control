@@ -3,63 +3,65 @@ import { motion } from 'framer-motion'
 import { Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-// Copied from welshdog-designs-web3-shop@src/components/admin/AdminAuth.jsx.
-// Same Supabase project, same `check-admin` edge function, same fallback
-// allowlist — so an admin who can log into the shop can log into Mission
-// Control without any extra setup.
+// Mission Control auth gate — course-owned, allowlist-driven.
 //
-// Next-commit upgrade: surface Supabase's native TOTP MFA challenge here
-// instead of bolting on Passport.js (Sacred Rule: don't double-build auth).
+// Why no edge function? The shop's `check-admin` edge fn lives in the shop
+// project. Mission Control runs against the **course** project, which may
+// or may not have an equivalent. So this commit goes simpler: Supabase Auth
+// signs the user in, then we check the email against VITE_ADMIN_ALLOWLIST
+// (comma-separated, set in .env.local). Defence in depth comes via RLS on
+// the `mc_missions` table.
+//
+// Hardening for commit #4: enroll Supabase MFA TOTP + add an `is_admin()`
+// RPC on the course project so the allowlist is server-side too.
 export default function AdminAuth({ onLogin }) {
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { data: { session }, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+
+    const { data: { session }, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError('Access denied: ' + error.message)
-    } else if (session) {
-      try {
-        const { data: adminData, error: funcError } = await supabase.functions.invoke('check-admin', {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        })
-
-        if (funcError) {
-          console.warn('Edge function check error, falling back to client check:', funcError)
-
-          const ALLOWED_ADMINS = ['admin@welsdogdesigns.com', 'lyndz@welsdogdesigns.com', 'lyndzwills@gmail.com']
-          if (ALLOWED_ADMINS.includes(email.toLowerCase())) {
-            if (typeof window !== 'undefined') {
-              window.localStorage.setItem('adminVerification', JSON.stringify({ via: 'fallback', email }))
-            }
-            if (onLogin) onLogin()
-          } else {
-            await supabase.auth.signOut()
-            setError('Unauthorized: You are not an admin.')
-          }
-        } else if (adminData?.isAdmin) {
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('adminVerification', JSON.stringify({ via: 'edge', email: adminData.email || email }))
-          }
-          if (onLogin) onLogin()
-        } else {
-          await supabase.auth.signOut()
-          setError('Unauthorized: You are not an admin.')
-        }
-      } catch (err) {
-        console.error('Auth verification error:', err)
-        setError('Security check failed. Please try again or contact support.')
-      }
+      setLoading(false)
+      return
     }
+    if (!session) {
+      setError('Login appeared to succeed but no session was issued. Try again.')
+      setLoading(false)
+      return
+    }
+
+    // Client-side allowlist check. VITE_ADMIN_ALLOWLIST is comma-separated.
+    const raw = (import.meta.env.VITE_ADMIN_ALLOWLIST || '').toLowerCase()
+    const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean)
+    const me = email.toLowerCase()
+
+    if (allowed.length === 0) {
+      // Empty allowlist = nobody — fail closed.
+      await supabase.auth.signOut()
+      setError('Mission Control allowlist is empty. Set VITE_ADMIN_ALLOWLIST in .env.local.')
+      setLoading(false)
+      return
+    }
+
+    if (!allowed.includes(me)) {
+      await supabase.auth.signOut()
+      setError('Unauthorized: this account is not on the Mission Control allowlist.')
+      setLoading(false)
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('mcAdminVerification', JSON.stringify({ via: 'allowlist', email: me }))
+    }
+    if (onLogin) onLogin()
     setLoading(false)
   }
 
@@ -104,9 +106,10 @@ export default function AdminAuth({ onLogin }) {
             disabled={loading}
             className="w-full btn-primary py-4 font-bold flex items-center justify-center gap-2 group disabled:opacity-50"
           >
-            <ShieldCheck className="w-5 h-5" /> {loading ? 'Authenticating...' : 'Authenticate'}
+            <ShieldCheck className="w-5 h-5" /> {loading ? 'Authenticating…' : 'Authenticate'}
           </button>
         </form>
+
         {error && (
           <div className="mt-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-left">
             {error}
@@ -114,7 +117,7 @@ export default function AdminAuth({ onLogin }) {
         )}
 
         <div className="mt-6 text-[10px] text-gray-600 font-mono uppercase tracking-widest">
-          System ID: WDD-MISSION-CONTROL
+          System ID: HVC-MISSION-CONTROL
         </div>
       </motion.div>
     </div>

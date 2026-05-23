@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Radio, ShoppingBag, UserPlus, Edit3, Trash2 } from 'lucide-react'
+import { Radio, Search, Edit3, Trash2, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-// ActivityTicker — last 20 events from Supabase Realtime.
+// ActivityTicker — last 20 course-ops events.
 //
-// DB events use Supabase Realtime (no Socket.io needed). External events
-// (V2.4 agent pings, login attempts) will pipe through the Socket.io
-// channel that lands in commit #3 — this component already merges anything
-// pushed onto `window.__mcExternalEvents` so wiring that is trivial later.
+// Subscribes to `mc_missions` (always present) and tries `user_level_progress`
+// (course progress events). Each subscription is wrapped so a missing table
+// just gets logged + skipped instead of crashing the panel.
+//
+// External events (V2.4 agent pings, login attempts) will pipe through the
+// Socket.io channel that lands in a later commit — this component already
+// merges anything pushed onto `window.__mcExternalEventPush`.
 const MAX_EVENTS = 20
 
 const formatTime = (iso) => {
@@ -18,11 +21,11 @@ const formatTime = (iso) => {
 
 const eventIcon = (type) => {
   switch (type) {
-    case 'order.new':      return <ShoppingBag className="w-3 h-3 text-emerald-300" />
-    case 'order.update':   return <Edit3 className="w-3 h-3 text-sky-300" />
-    case 'order.delete':   return <Trash2 className="w-3 h-3 text-rose-300" />
-    case 'demo.new':       return <UserPlus className="w-3 h-3 text-fuchsia-300" />
-    default:               return <Radio className="w-3 h-3 text-brand-accent" />
+    case 'mission.new':      return <Search className="w-3 h-3 text-amber-300" />
+    case 'mission.update':   return <Edit3  className="w-3 h-3 text-sky-300" />
+    case 'mission.delete':   return <Trash2 className="w-3 h-3 text-rose-300" />
+    case 'progress.update':  return <Sparkles className="w-3 h-3 text-emerald-300" />
+    default:                 return <Radio  className="w-3 h-3 text-brand-accent" />
   }
 }
 
@@ -33,42 +36,46 @@ export default function ActivityTicker() {
     setEvents((prev) => [{ ...ev, ts: new Date(), key: `${Date.now()}-${Math.random()}` }, ...prev].slice(0, MAX_EVENTS))
 
   useEffect(() => {
-    // --- Supabase Realtime: orders ---
-    const ordersCh = supabase
-      .channel('mc-ticker-orders')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (p) =>
-        push({ type: 'order.new', text: `New order #${p.new.order_number || p.new.id} from ${p.new.customer_name || 'anon'}` })
+    // --- mc_missions (created by Agent Actions + manual + drag-and-drop) ---
+    const missionsCh = supabase
+      .channel('mc-ticker-missions')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mc_missions' }, (p) =>
+        push({ type: 'mission.new', text: `Mission: ${p.new.title}` })
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (p) => {
-        const oldS = p.old?.fulfillment_status, newS = p.new?.fulfillment_status
-        if (oldS !== newS) {
-          push({ type: 'order.update', text: `Order #${p.new.order_number || p.new.id} → ${newS}` })
-        } else {
-          push({ type: 'order.update', text: `Order #${p.new.order_number || p.new.id} updated` })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mc_missions' }, (p) => {
+        if (p.old?.lane !== p.new?.lane) {
+          push({ type: 'mission.update', text: `"${p.new.title}" → ${p.new.lane}` })
         }
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (p) =>
-        push({ type: 'order.delete', text: `Order #${p.old.order_number || p.old.id} deleted` })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'mc_missions' }, (p) =>
+        push({ type: 'mission.delete', text: `Mission deleted (${p.old?.title || p.old?.id})` })
       )
       .subscribe()
 
-    // --- Supabase Realtime: demo_bookings ---
-    const demoCh = supabase
-      .channel('mc-ticker-demo')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'demo_bookings' }, (p) =>
-        push({ type: 'demo.new', text: `Demo booking: ${p.new.name || p.new.email || 'anon'}` })
-      )
+    // --- user_level_progress (course completions / progress) ---
+    // Wrapped: if the table isn't in the realtime publication or doesn't
+    // exist, the channel will just sit idle — no crash.
+    const progressCh = supabase
+      .channel('mc-ticker-progress')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_level_progress' }, (p) => {
+        const done = !!p.new?.completed_at && !p.old?.completed_at
+        push({
+          type: 'progress.update',
+          text: done
+            ? `Level ${p.new.level ?? '?'} completed by ${p.new.user_id?.slice(0, 8) ?? '?'}…`
+            : `Level ${p.new.level ?? '?'} updated`,
+        })
+      })
       .subscribe()
 
-    // --- External-event hook (Socket.io plumbing arrives in commit #3) ---
+    // --- External event hook (Socket.io plumbing arrives in a later commit) ---
     if (typeof window !== 'undefined') {
-      window.__mcExternalEvents = window.__mcExternalEvents || []
       window.__mcExternalEventPush = (ev) => push({ type: 'external', ...ev })
     }
 
     return () => {
-      supabase.removeChannel(ordersCh)
-      supabase.removeChannel(demoCh)
+      supabase.removeChannel(missionsCh)
+      supabase.removeChannel(progressCh)
     }
   }, [])
 
@@ -80,7 +87,7 @@ export default function ActivityTicker() {
 
       {events.length === 0 ? (
         <p className="text-xs text-gray-500 font-mono italic">
-          No events yet — orders / bookings will stream here as they happen.
+          No events yet — missions + course progress will stream here as they happen.
         </p>
       ) : (
         <ul className="space-y-2 custom-scrollbar max-h-[60vh] overflow-y-auto pr-1">
