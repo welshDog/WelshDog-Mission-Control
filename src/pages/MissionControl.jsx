@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
 import { Activity, LogOut, RefreshCw, Rocket, Stethoscope } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import AdminAuth from '../components/admin/AdminAuth'
+import AdminCalendar from '../components/AdminCalendar'
+import OrdersKanban from '../components/mission/OrdersKanban'
+import ActivityTicker from '../components/mission/ActivityTicker'
 
 // MissionControl — the auth-gated shell. This commit lands the chrome:
 //   - Top bar with LIVE clock (auto-syncing every second) + system-health pill
@@ -59,9 +61,8 @@ export default function MissionControl() {
   // ---- Authed shell ----
   const dateStr = now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
   const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  const month = now.getMonth() // 0-11 — seasonal planner auto-highlight base
 
-  // System health is hard-coded green this commit; commit #2 wires the real
+  // System health: hard-coded green for now. Commit #3 wires the real
   // Supabase + Socket.io heartbeat into this pill.
   const healthPill = <span className="pill-green flex items-center gap-1"><Activity className="w-3 h-3" /> ALL SYSTEMS GO</span>
 
@@ -112,38 +113,18 @@ export default function MissionControl() {
       {/* ── MAIN + RIGHT SIDEBAR ──────────────────────────────────────────── */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
         <main className="space-y-6">
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-panel rounded-2xl p-6 border border-white/10"
-          >
-            <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold mb-2">Kanban Board</h2>
-            <p className="text-gray-400 text-sm">
-              <span className="font-mono">PENDING → PRINTING → PACKED → SHIPPED → DELIVERED</span> — drag-and-drop
-              order lanes wired to Supabase Realtime. Landing in the next commit.
-            </p>
-          </motion.section>
+          {/* Kanban — orders by fulfillment_status, drag-and-drop persists to Supabase */}
+          <OrdersKanban />
 
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="glass-panel rounded-2xl p-6 border border-white/10"
-          >
-            <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold mb-2">Seasonal Planner</h2>
-            <p className="text-gray-400 text-sm">
-              Current month index: <span className="font-mono text-white">{month}</span> — calendar
-              auto-highlight wires up when <code className="font-mono">AdminCalendar</code> is pulled across.
-            </p>
-          </motion.section>
+          {/* Seasonal planner — same component the shop uses; current month auto-highlights */}
+          <section className="glass-panel rounded-2xl p-6 border border-white/10">
+            <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold mb-4">Seasonal Planner</h2>
+            <AdminCalendar />
+          </section>
         </main>
 
         <aside className="glass-panel rounded-2xl p-6 border border-white/10 h-fit">
-          <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold mb-3">Live Activity</h2>
-          <p className="text-gray-500 text-xs font-mono">
-            Ticker feed (orders · status changes · login attempts · agent pings) wires up when the
-            Socket.io + Supabase Realtime channels are bolted on next commit.
-          </p>
+          <ActivityTicker />
         </aside>
       </div>
 

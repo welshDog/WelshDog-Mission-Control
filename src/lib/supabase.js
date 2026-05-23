@@ -39,6 +39,21 @@ export const updateOrderStatus = async (orderId, status) => {
   return data?.[0] || null
 }
 
+// Mission Control: the Kanban writes here. Requires the
+// supabase/migrations/20260523120000_*.sql migration to have been applied.
+export const updateFulfillmentStatus = async (orderId, fulfillment_status) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ fulfillment_status, updated_at: new Date() })
+    .eq('id', orderId)
+    .select()
+  if (error) {
+    console.error('Error updating fulfillment_status:', error)
+    throw error
+  }
+  return data?.[0] || null
+}
+
 // --- Settings (top-bar feature flags) ---
 
 export const fetchShopSettings = async () => {
