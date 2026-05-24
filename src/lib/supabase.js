@@ -252,12 +252,24 @@ export const snoozeStraggler = async (userId, hours = 24) => {
 }
 
 // 🎯 Catch Stragglers — send a DM via the MC API (server/index.js).
+// As of v0.6.0 the server requires an admin JWT — we attach the
+// caller's Supabase session token as a Bearer header. If there's no
+// session we fail fast with a synthetic 401 (matches the server's
+// shape so the UI can render the same error path).
+//
 // Returns the server's response shape directly so the UI can branch on
-// rate-limit / no-channel without re-parsing.
+// rate-limit / 401 / 403 / no-channel without re-parsing.
 export const sendStragglerDM = async ({ userId, discordId, email, message, tone }) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    return { status: 401, success: false, userId, error: 'no_session' }
+  }
   const res = await fetch('/api/send-dm', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
     body: JSON.stringify({ userId, discordId, email, message, tone }),
   })
   const payload = await res.json().catch(() => ({}))

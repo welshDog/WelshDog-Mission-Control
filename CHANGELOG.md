@@ -4,6 +4,86 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.6.0] — 2026-05-24
+
+### Added — **Server-side admin JWT auth + first `mc_events` consumer**
+Closes the security gap surfaced earlier today and turns on the v0.5.0
+spine for real. Every protected endpoint now requires a verified
+admin JWT, and every protected mutation writes an immutable
+`mc_events` row stamped with the verified actor.
+
+- **`requireAdmin` Express middleware (`server/index.js`)**
+  - Pulls `Authorization: Bearer <jwt>` from the request.
+  - Verifies the JWT via `supabase.auth.getUser(token)` — the
+    service-role client does the signature + expiry check using the
+    project's JWT secret.
+  - Looks up `users.role` and rejects with **403** if the caller
+    isn't an admin (defence in depth on top of the AdminAuth client
+    allowlist).
+  - On success, attaches `req.user = { id, email }` so handlers stamp
+    the verified actor — no more "trust the client payload" surface.
+  - Error shapes: `401 missing_bearer_token` / `401 invalid_token` /
+    `403 forbidden_not_admin` / `500 role_lookup_failed`.
+
+- **`/api/send-dm` is the first protected route**
+  - Was: CORS-only gate, anyone in the allowlist could send DMs.
+  - Now: `requireAdmin` runs first; unauthed callers can't even
+    enumerate the rate-limit endpoint, let alone send a message.
+
+- **`emitEvent()` helper** — single entry point for every `mc_events`
+  insert. Defaults `actor` to `req.user.email`, supports `'system'`
+  for autonomous events (cron / webhooks later). Errors are logged
+  but never thrown — the audit row failing must never fail the
+  user-facing action that already succeeded.
+
+- **`/api/send-dm` now emits a `straggler.dm_sent` event** to
+  `mc_events` (in addition to the existing `mc_missions` Kanban row).
+  Structured `payload` — `{ userId, channel, tone, discordMessageId,
+  discordError, messageLength }` — so future "show me every DM I
+  sent in May" queries hit the gin index instead of LIKE-scanning
+  `notes`. Mission row's new `owner` column is also stamped now that
+  the schema bump from v0.5.0 supports it.
+
+- **Client side (`src/lib/supabase.js` + `CatchStragglers.jsx`)**
+  - `sendStragglerDM` fetches `supabase.auth.getSession()` and attaches
+    `Authorization: Bearer <access_token>` on every call. Synthetic
+    `401 no_session` returned if there's no session (matches server
+    error shape so the UI renders one error path).
+  - `CatchStragglers` row error surface now distinguishes 401
+    (session expired — sign out + back in), 403 (not admin — server
+    blocked it), and 429 / generic. Clearer than "HTTP 401".
+
+### Fixed — **server boot crash from earlier replace_all sloppiness**
+`server/index.js` line 28 had `const DISCORD_BOT_TOKEN =
+DISCORD_BOT_TOKEN || process.env.DISCORD_TOKEN` — a TDZ self-
+reference my `replace_all: true` introduced when I renamed
+`process.env.DISCORD_BOT_TOKEN` → `DISCORD_BOT_TOKEN` in v0.4.x.
+Would have thrown `ReferenceError: Cannot access 'DISCORD_BOT_TOKEN'
+before initialization` on first boot. Caught on read before any
+smoke test had to surface it. Now correctly reads
+`process.env.DISCORD_BOT_TOKEN || process.env.DISCORD_TOKEN`.
+**Lesson noted for future: `replace_all` near a `const` declaration
+is dangerous; always verify the declaration line by hand.**
+
+### What this unblocks
+- **Grant Tokens** — `/api/grant-tokens` can now ship without a real
+  security surface: the JWT proves the caller, the audit row proves
+  the action, the immutability triggers prove the history is real.
+- **Refund** — same pattern + Stripe idempotency keys baked into
+  `payload`.
+- **Live Activity v2** — `mc_events` is now actively being written to,
+  so swapping `ActivityTicker` over to subscribe from there yields a
+  real stream of human actions, not a poll of state-table mutations.
+
+### Sacred rules honoured
+- ✅ `DISCORD_BOT_TOKEN` + `SUPABASE_SERVICE_ROLE_KEY` remain env-only;
+  no new client-exposed env vars.
+- ✅ `mc_events` writes still go through service_role (server only);
+  the no-INSERT-policy hardening from v0.5.0 is preserved.
+- ✅ Idempotent boot — server still starts even with missing env so
+  `/api/health` works for diagnostics; protected routes return 500s
+  cleanly until env is set.
+
 ## [0.5.0] — 2026-05-24
 
 ### Added — **`mc_events` spine + `mc_missions` schema bump**
