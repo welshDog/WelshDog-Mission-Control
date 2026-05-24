@@ -4,6 +4,66 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.5.0] — 2026-05-24
+
+### Added — **`mc_events` spine + `mc_missions` schema bump**
+The single highest-leverage move on the Mission Control roadmap.
+`mc_missions` was doubling as state + history (signal_source carrying
+userIds as a workaround). Splitting the two unlocks: a real Live
+Activity feed, audit trails for every Agent Action, actor attribution,
+and event-source replay.
+
+- **Migration:** `supabase/migrations/20260524000000_mc_events_and_missions_schema_bump.sql`.
+  Applied via Supabase MCP `apply_migration` against the Vibe Coding
+  Course project (`yhtmuibgdnxhbgboajhc`). Verified on apply — all 6
+  invariants returned true (table exists · 2 columns added to
+  mc_missions · 4 custom indexes · 2 immutability triggers · RLS on ·
+  realtime publication).
+
+- **New table `public.mc_events`** — append-only event log:
+  - Columns: `id uuid pk` · `mission_id uuid → mc_missions(id) ON DELETE SET NULL` ·
+    `event_type text` · `actor text` · `payload jsonb` · `created_at timestamptz`.
+    Deleting a mission preserves its history (FK nulls, doesn't cascade).
+  - **Immutability triggers** block UPDATE + DELETE for every role
+    (including service_role). Corrections are made by INSERTing a new
+    event (e.g. `event_type = '*.corrected'`). TRUNCATE remains
+    available for explicit ops resets.
+  - Indexes for the four real query patterns:
+    `(created_at DESC)` activity feed · `(mission_id, created_at DESC)`
+    mission detail drawer · `(event_type, created_at DESC)` filter ·
+    `GIN(payload)` for future `WHERE payload->>'user_id' = ?` queries.
+  - **Realtime publication** added → Live Activity feed gets free
+    streaming via supabase-js realtime.
+
+- **Security tightening over the naive design:**
+  - `mc_events` RLS enabled. **SELECT** policy for `authenticated`
+    (defence in depth — AdminAuth allowlist gates the app already).
+    **No INSERT policy at all.** Only `service_role` (the MC Express
+    server) writes events; service_role bypasses RLS, so the absence
+    of an INSERT policy is the security control. A compromised
+    browser session cannot inject fake audit lines like
+    `{actor: 'lyndzwills@gmail.com', event_type: 'tokens.granted', payload: {amount: 1_000_000}}`.
+
+- **`mc_missions` columns added (both nullable, existing rows survive):**
+  - `owner text` — free-form for now (email-shaped); may become
+    `uuid → users.id` once mission-ownership UX firms up.
+  - `priority text` — constrained by CHECK to `p0` / `p1` / `p2` /
+    `p3` so the Kanban can colour-code rows reliably.
+  - Partial indexes on both — only index rows where the column is set
+    so the index stays small and pre-existing un-owned/un-prioritised
+    rows don't consume space.
+
+### What this unblocks (next commits)
+- Live Activity feed v2 — `SELECT FROM mc_events ORDER BY created_at DESC LIMIT 50` + realtime subscribe; replaces the current mc_missions+user_level_progress proxy stream.
+- Grant Tokens + Refund — each Agent Action emits a `tokens.granted` / `refund.issued` event with full audit detail, actor stamped from the JWT.
+- Catch Stragglers audit upgrade — supplement the current `mc_missions` shipped-lane row with a structured `straggler.dm_sent` event (channel, tone, message hash, discord_message_id all queryable via `payload`).
+- Missions Board owner/priority chips — UI work only, schema is now ready.
+
+### Sacred rules honoured
+- ✅ Applied via Supabase MCP `apply_migration` — never `supabase db push`.
+- ✅ Migration is fully idempotent (`IF NOT EXISTS`, `DO $$ ... END $$` guards on constraints + publication adds, `OR REPLACE` on the trigger function).
+- ✅ `DISCORD_BOT_TOKEN` + `SUPABASE_SERVICE_ROLE_KEY` remain env-only; no new client-exposed env vars in this commit.
+
 ## [0.4.0] — 2026-05-23
 
 ### Added — **Catch Stragglers, live end-to-end**
