@@ -71,7 +71,7 @@ export default function MissionControl() {
           </div>
           <div>
             <h1 className="text-lg font-black accent-gradient-text leading-tight">Mission Control</h1>
-            <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">HVC-MISSION-CONTROL · v0.6.0</p>
+            <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">HVC-MISSION-CONTROL · v0.7.0</p>
           </div>
         </div>
 

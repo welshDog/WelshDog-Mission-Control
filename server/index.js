@@ -1,8 +1,10 @@
 // server/index.js — Mission Control's tiny ops API.
 //
 // Endpoints:
-//   GET  /api/health  — diagnostic (unauth, safe to expose)
-//   POST /api/send-dm — admin-only (JWT-verified), Catch Stragglers DM delivery
+//   GET  /api/health                 — diagnostic (unauth, safe to expose)
+//   POST /api/send-dm                — admin-only, Catch Stragglers DM delivery
+//   POST /api/grant-tokens/preview   — admin-only, look up user before grant
+//   POST /api/grant-tokens           — admin-only, award BROski$ via existing award_tokens() RPC
 //
 // Auth model (v0.6.0):
 //   Every protected endpoint runs the `requireAdmin` middleware, which:
@@ -37,6 +39,7 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 dotenv.config({ path: '.env.local' })
@@ -63,6 +66,14 @@ if (missing.length > 0) {
 const PORT = Number(process.env.API_PORT) || 3011
 const DISCORD_API = 'https://discord.com/api/v10'
 const RATE_LIMIT_MS = 24 * 60 * 60 * 1000
+
+// Token grant guardrails (env-overrideable). Hard cap per single call —
+// catches finger-trouble. Daily-aggregate caps land in a follow-up
+// once we have enough audit data to set them sensibly.
+const MAX_GRANT_PER_CALL = Number(process.env.MAX_GRANT_PER_CALL) || 10000
+
+// UUID v4 shape check (cheap pre-validation before we hit the DB).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // ── Supabase (service-role; server-only, bypasses RLS) ────────────────
 const supabase =
@@ -331,8 +342,184 @@ app.post('/api/send-dm', requireAdmin, async (req, res) => {
   return res.json({ success: true, userId, channel, messageId })
 })
 
+// ── /api/grant-tokens/preview ─────────────────────────────────────────
+// Admin-only. Body: { userId }
+// Returns: { success: true, userId, email, fullName, currentBalance, maxGrantPerCall }
+//          { success: false, error }
+//
+// Purpose: before the operator commits a grant, confirm the userId
+// resolves to a real user and surface current balance. Cheap read,
+// no side effects, no audit row (a preview that didn't run shouldn't
+// pollute the audit log).
+app.post('/api/grant-tokens/preview', requireAdmin, async (req, res) => {
+  const { userId } = req.body || {}
+  if (!userId || typeof userId !== 'string' || !UUID_RE.test(userId)) {
+    return res.status(400).json({ success: false, error: 'userId_must_be_uuid' })
+  }
+
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, email, full_name, broski_tokens')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error('[mc-api] preview user lookup failed:', error)
+    return res.status(500).json({ success: false, error: 'user_lookup_failed' })
+  }
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'user_not_found' })
+  }
+
+  return res.json({
+    success: true,
+    userId: user.id,
+    email: user.email,
+    fullName: user.full_name,
+    currentBalance: user.broski_tokens ?? 0,
+    maxGrantPerCall: MAX_GRANT_PER_CALL,
+  })
+})
+
+// ── /api/grant-tokens ─────────────────────────────────────────────────
+// Admin-only. Body: { userId, amount, reason, idempotencyKey? }
+// Returns: { success, awarded, newBalance, email, fullName, idempotencyKey }
+//
+// award_tokens() in the course Supabase is SECURITY DEFINER + idempotent
+// via the (user_id, reason, source_id) partial unique constraint on
+// token_transactions. We pass `mc-grant-<idempotencyKey>` as p_source_id
+// so a double-click / retry never grants twice; the RPC's `awarded:false`
+// return lets us tell the operator "already done" without erroring.
+//
+// Audit: emit a `tokens.granted` mc_events row (and an mc_missions
+// shipped-lane card the operator can see on the Kanban). Both writes
+// are best-effort — if either fails after the grant landed, we log and
+// still return success so the operator's UI moves on.
+app.post('/api/grant-tokens', requireAdmin, async (req, res) => {
+  const { userId, amount, reason } = req.body || {}
+  const idempotencyKey =
+    typeof req.body?.idempotencyKey === 'string' && req.body.idempotencyKey.length > 0
+      ? req.body.idempotencyKey
+      : randomUUID()
+
+  // Validate.
+  if (!userId || typeof userId !== 'string' || !UUID_RE.test(userId)) {
+    return res.status(400).json({ success: false, error: 'userId_must_be_uuid' })
+  }
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'amount_must_be_positive_integer' })
+  }
+  if (amount > MAX_GRANT_PER_CALL) {
+    return res.status(400).json({
+      success: false,
+      error: 'amount_exceeds_cap',
+      maxGrantPerCall: MAX_GRANT_PER_CALL,
+    })
+  }
+  if (typeof reason !== 'string' || reason.trim().length < 3) {
+    return res.status(400).json({ success: false, error: 'reason_required_min_3_chars' })
+  }
+
+  const actor = req.user?.email || 'unknown'
+  const sourceId = `mc-grant-${idempotencyKey}`
+
+  // Call award_tokens — atomic ledger insert + balance bump in one RPC.
+  const { data: grantData, error: grantErr } = await supabase.rpc('award_tokens', {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: reason.trim(),
+    p_source_id: sourceId,
+  })
+  if (grantErr) {
+    console.error('[mc-api] award_tokens RPC failed:', grantErr)
+    return res.status(500).json({ success: false, error: 'award_tokens_rpc_failed', detail: grantErr.message })
+  }
+
+  const awarded = grantData?.awarded === true
+  const newBalance = grantData?.new_balance ?? null
+
+  // Pull profile fields for the audit + the UI's success message.
+  let userEmail = null
+  let userName = null
+  try {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('email, full_name')
+      .eq('id', userId)
+      .maybeSingle()
+    userEmail = profile?.email ?? null
+    userName = profile?.full_name ?? null
+  } catch (e) {
+    console.error('[mc-api] profile lookup post-grant failed:', e)
+  }
+
+  // mc_missions audit (Kanban card). Skipped on idempotent no-op so the
+  // operator doesn't see a phantom "shipped" card for a grant that
+  // didn't actually move the balance.
+  let missionId = null
+  if (awarded) {
+    const notes = [
+      `userId: ${userId}`,
+      `email: ${userEmail || 'unknown'}`,
+      `amount: +${amount} BROski$`,
+      `new_balance: ${newBalance}`,
+      `actor: ${actor}`,
+      `idempotency_key: ${idempotencyKey}`,
+      '',
+      'reason:',
+      reason.trim(),
+    ].join('\n')
+
+    const { data: missionRows, error: insErr } = await supabase
+      .from('mc_missions')
+      .insert([
+        {
+          title: `Granted ${amount} BROski$ · ${userEmail || userId.slice(0, 8) + '…'}`,
+          signal_source: `grant_tokens:${idempotencyKey}`,
+          lane: 'shipped',
+          owner: actor,
+          priority: amount >= 1000 ? 'p1' : 'p2',
+          notes,
+        },
+      ])
+      .select('id')
+    if (insErr) {
+      console.error('[mc-api] mc_missions audit insert failed:', insErr)
+    } else {
+      missionId = missionRows?.[0]?.id ?? null
+    }
+  }
+
+  // mc_events row — ALWAYS, even on idempotent no-op, because the
+  // operator's INTENT to grant is itself audit-worthy ("tried again,
+  // got the idempotent no-op"). event_type encodes the outcome.
+  await emitEvent({
+    missionId,
+    eventType: awarded ? 'tokens.granted' : 'tokens.grant_skipped_duplicate',
+    actor,
+    payload: {
+      userId,
+      email: userEmail,
+      amount,
+      reason: reason.trim(),
+      newBalance,
+      idempotencyKey,
+      sourceId,
+    },
+  })
+
+  return res.json({
+    success: true,
+    awarded,
+    newBalance,
+    email: userEmail,
+    fullName: userName,
+    idempotencyKey,
+  })
+})
+
 // ── Boot ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🛰️  mc-api listening on http://localhost:${PORT}`)
   console.log(`   CORS allowlist: ${[...corsAllowlist].join(', ') || '(empty)'}`)
+  console.log(`   Max grant per call: ${MAX_GRANT_PER_CALL} BROski$`)
 })

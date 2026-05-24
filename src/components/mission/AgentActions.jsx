@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Stethoscope, Sunrise, UserCheck, Coins, Undo2, ScanSearch, Loader, X } from 'lucide-react'
 import { runHealthPulse, runMorningBrief } from '../../lib/supabase'
 import CatchStragglers from './CatchStragglers'
+import GrantTokens from './GrantTokens'
 
 // The "do behind the scenes" panel. Each button represents an admin agent
 // action — most are placeholders this commit; we ship THREE real ones now
@@ -17,7 +18,7 @@ const ACTIONS = [
   { id: 'pulse',      label: 'Health Pulse',     Icon: Stethoscope, desc: 'Scan course signals → auto-create missions',            enabled: true  },
   { id: 'brief',      label: 'Morning Brief',    Icon: Sunrise,     desc: '60-second summary of the last 24h',                     enabled: true  },
   { id: 'stragglers', label: 'Catch Stragglers', Icon: UserCheck,   desc: 'Find idle students · draft DMs you approve · send',     enabled: true  },
-  { id: 'grant',      label: 'Grant Tokens',     Icon: Coins,       desc: 'Pick user + amount + reason → award_tokens() w/ audit', enabled: false },
+  { id: 'grant',      label: 'Grant Tokens',     Icon: Coins,       desc: 'Pick user + amount + reason → award_tokens() w/ audit', enabled: true  },
   { id: 'refund',     label: 'Refund',           Icon: Undo2,       desc: 'Stripe + token refund in one click (reversible)',       enabled: false },
   { id: 'drift',      label: 'Drift Scan',       Icon: ScanSearch,  desc: 'Re-run quiz true/false positional scan',                 enabled: false },
 ]
@@ -29,6 +30,7 @@ export default function AgentActions() {
   const [result, setResult]           = useState(null)  // { id, payload }
   const [error, setError]             = useState(null)
   const [showStragglers, setShowStr]  = useState(false) // overlay visibility
+  const [showGrant, setShowGrant]     = useState(false) // grant overlay visibility
 
   const run = async (id) => {
     // Catch Stragglers is rich enough to need its own panel — open the
@@ -37,6 +39,10 @@ export default function AgentActions() {
     // double-log here.
     if (id === 'stragglers') {
       setShowStr(true)
+      return
+    }
+    if (id === 'grant') {
+      setShowGrant(true)
       return
     }
 
@@ -169,6 +175,9 @@ export default function AgentActions() {
 
       {/* Catch Stragglers — full-screen overlay (its own AnimatePresence) */}
       {showStragglers && <CatchStragglers onClose={() => setShowStr(false)} />}
+
+      {/* Grant Tokens — modal overlay (its own AnimatePresence) */}
+      {showGrant && <GrantTokens onClose={() => setShowGrant(false)} />}
     </section>
   )
 }

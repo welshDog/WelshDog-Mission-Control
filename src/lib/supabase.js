@@ -276,6 +276,49 @@ export const sendStragglerDM = async ({ userId, discordId, email, message, tone 
   return { status: res.status, ...payload }
 }
 
+// 💰 Grant Tokens — preview. Looks up the target user so the operator
+// can confirm name + email + current balance before committing the
+// grant. Read-only; no audit row (a preview that never grants
+// shouldn't pollute the audit log).
+export const previewGrantTokens = async ({ userId }) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    return { status: 401, success: false, error: 'no_session' }
+  }
+  const res = await fetch('/api/grant-tokens/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ userId }),
+  })
+  const payload = await res.json().catch(() => ({}))
+  return { status: res.status, ...payload }
+}
+
+// 💰 Grant Tokens — commit. Calls the existing award_tokens() RPC via
+// the server (server holds the service-role key + stamps the verified
+// actor into mc_events). idempotencyKey is optional — server generates
+// one if absent, but supplying a stable one from the UI lets retries
+// be safe (RPC dedups on (user_id, reason, source_id)).
+export const grantTokens = async ({ userId, amount, reason, idempotencyKey }) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    return { status: 401, success: false, error: 'no_session' }
+  }
+  const res = await fetch('/api/grant-tokens', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ userId, amount, reason, idempotencyKey }),
+  })
+  const payload = await res.json().catch(() => ({}))
+  return { status: res.status, ...payload }
+}
+
 // ☀️ Morning Brief — last-24h aggregate. Returns a plain object so the UI
 // can render it as a modal without leaking column-name assumptions.
 export const runMorningBrief = async () => {

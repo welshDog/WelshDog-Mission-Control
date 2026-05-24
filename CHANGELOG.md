@@ -4,6 +4,88 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.7.0] — 2026-05-24
+
+### Added — **Grant Tokens, live end-to-end**
+Fourth Agent Action shipped. Uses the existing `award_tokens()` RPC in
+the course Supabase (SECURITY DEFINER, idempotent via the
+`(user_id, reason, source_id)` partial unique constraint on
+`token_transactions`) — no reinvention, no new DB primitives. The
+v0.6.0 JWT middleware + v0.5.0 mc_events spine made this safe to
+ship.
+
+- **Two-step server flow (deliberate, prevents finger-trouble):**
+  - `POST /api/grant-tokens/preview` (admin-only) — verify the
+    userId resolves to a real user; returns `{ email, fullName,
+    currentBalance, maxGrantPerCall }`. Read-only, no audit row.
+  - `POST /api/grant-tokens` (admin-only) — calls `award_tokens()`,
+    emits `mc_events`, writes `mc_missions` Kanban card. Returns
+    `{ awarded, newBalance, email, fullName, idempotencyKey }`.
+
+- **Validation hardened on the server:**
+  - `userId` must match RFC-4122 v4 UUID regex
+  - `amount` must be positive integer ≤ `MAX_GRANT_PER_CALL`
+    (env-overrideable, default **10,000 BROski$**)
+  - `reason` must be ≥ 3 chars after trim — required for audit
+  - All four error shapes machine-readable for clean UI handling
+
+- **Idempotency baked in:**
+  - Client generates a stable UUID per editing session (re-used on
+    retries; new on Reset / Grant another)
+  - Server passes `mc-grant-<uuid>` as `p_source_id` into the RPC
+  - Double-click / retry / network flake = `awarded: false` no-op,
+    not a duplicate grant. UI distinguishes "Tokens granted" from
+    "Already granted (idempotent no-op)"
+
+- **Audit pattern matches Catch Stragglers (v0.6.0):**
+  - `mc_missions` shipped-lane card (skipped on idempotent no-op so
+    the operator doesn't see phantom cards)
+  - `mc_events` row ALWAYS emitted, with `event_type` distinguishing
+    `tokens.granted` vs `tokens.grant_skipped_duplicate` — the
+    operator's INTENT to grant is itself audit-worthy
+  - Mission row's `owner` + `priority` columns from v0.5.0 are
+    stamped (priority `p1` for grants ≥1000, `p2` otherwise)
+  - All actor stamps come from the verified JWT, never from the
+    client payload
+
+- **UI — `src/components/mission/GrantTokens.jsx`** (new, ~260 LOC):
+  - Two-step overlay: fill form → **Preview user** (verify) → **Grant**
+  - Live UUID validity check on the userId input
+  - Per-call cap surfaced from the server preview
+  - "After grant" projected balance shown once amount is entered
+  - Success state shows recipient + new balance + "Grant another" /
+    "Done" actions
+  - Error surface distinguishes 401 (session expired), 403 (not
+    admin), `user_not_found`, `amount_exceeds_cap`, etc.
+  - Esc-to-close disabled while a grant is in flight (so a stray
+    keystroke can't lose a half-finished grant)
+
+- **Wiring:** AgentActions' "Grant Tokens" tile flipped to
+  `enabled: true`. Live count `3/6 → 4/6`. Clicking opens the
+  overlay (same pattern as Catch Stragglers).
+
+- **Env var added** (optional, with sensible default):
+  - `MAX_GRANT_PER_CALL` — int, default 10000. Documented in
+    `.env.example` placeholder.
+
+### What this unblocks / what's next
+- **Refund** — symmetric to Grant: same auth + audit + idempotency
+  pattern, plus Stripe idempotency keys for the cash-side refund.
+- **Daily-aggregate cap on grants** — once we have a few days of
+  audit data in `mc_events`, decide a sensible threshold and add a
+  server-side rolling-window check.
+- **User search picker** — currently the operator pastes a UUID;
+  could add a search-by-email step once we know the operator flow.
+
+### Sacred rules honoured
+- ✅ `award_tokens()` is the existing course RPC — no schema changes,
+  no new primitives, no duplication of token plumbing.
+- ✅ JWT middleware + service_role pattern from v0.6.0 reused
+  unchanged.
+- ✅ `mc_events` writes still service-role-only; the immutability
+  triggers from v0.5.0 still cover this table.
+- ✅ All env-only secrets remain so — no new VITE_* exposure.
+
 ## [0.6.0] — 2026-05-24
 
 ### Added — **Server-side admin JWT auth + first `mc_events` consumer**
