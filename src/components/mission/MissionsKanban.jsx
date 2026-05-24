@@ -94,12 +94,12 @@ export default function MissionsKanban() {
   // --- Render -----------------------------------------------------------
   return (
     <section className="glass-panel rounded-2xl p-6 border border-white/10">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-x-4 gap-y-2">
         <h2 className="text-sm uppercase tracking-widest text-brand-accent font-bold flex items-center gap-2">
           <Search className="w-4 h-4" /> Missions — Course Ops
         </h2>
         <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
-          <span>{missions.length} mission{missions.length === 1 ? '' : 's'}</span>
+          <span className="mr-1">{missions.length} mission{missions.length === 1 ? '' : 's'}</span>
           <button
             onClick={handleManualCreate}
             className="btn-secondary py-1 px-2 text-[10px] flex items-center gap-1"
@@ -124,7 +124,7 @@ export default function MissionsKanban() {
       )}
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6">
           {COLUMNS.map(({ id, label, Icon, accent }) => (
             <Droppable droppableId={id} key={id}>
               {(provided, snapshot) => (
@@ -133,11 +133,11 @@ export default function MissionsKanban() {
                   {...provided.droppableProps}
                   className={`rounded-xl border ${accent} ${
                     snapshot.isDraggingOver ? 'bg-white/10' : 'bg-white/5'
-                  } p-3 min-h-[200px] flex flex-col gap-2 transition-colors`}
+                  } p-4 min-h-[200px] flex flex-col gap-2 transition-colors`}
                 >
-                  <div className={`flex items-center justify-between text-xs font-bold uppercase tracking-wider ${accent.split(' ').pop()}`}>
-                    <span className="flex items-center gap-1"><Icon className="w-3 h-3" /> {label}</span>
-                    <span className="font-mono opacity-80">{byLane[id]?.length || 0}</span>
+                  <div className={`flex items-center justify-between gap-3 pb-2 mb-1 border-b border-white/5 text-xs font-bold uppercase tracking-wider ${accent.split(' ').pop()}`}>
+                    <span className="flex items-center gap-1.5 min-w-0 truncate"><Icon className="w-3 h-3 shrink-0" /> {label}</span>
+                    <span className="font-mono opacity-80 shrink-0">{byLane[id]?.length || 0}</span>
                   </div>
 
                   {(byLane[id] || []).map((m, idx) => (

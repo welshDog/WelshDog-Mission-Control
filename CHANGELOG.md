@@ -4,6 +4,42 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.7.1] — 2026-05-24
+
+### Fixed — three layout bugs caught in pre-smoke review
+Pre-smoke visual review of the v0.7.0 operator deck flagged three
+cramped spots. None were functional, but all made the page read as
+"compressed" rather than "deliberate":
+
+- **MissionsKanban header row** — `0 missions` count + "New" / "Sync"
+  buttons were running flush against each other (and visually
+  bleeding into the column headers below on narrow viewports). Added
+  `gap-x-4 gap-y-2` flex spacing + `mr-1` on the count text + bumped
+  the row's `mb-4 → mb-5` so it owns its own breathing zone above
+  the columns.
+- **Pipeline columns cramped** — `gap-4` between the four lanes was
+  too tight; bumped to `gap-5 md:gap-6` (and column interior padding
+  `p-3 → p-4`). Column header gained `gap-3 pb-2 mb-1 border-b
+  border-white/5` so the label + count are visually separated AND
+  there's a subtle divider before the cards. Label is now
+  `min-w-0 truncate` and icon/count are `shrink-0` so DETECTED /
+  INVESTIGATING / FIXING / SHIPPED never overflow into the count.
+- **`SOOND` badge bleed (SOON badge running into the next tile)** —
+  AgentActions tiles had inconsistent heights, so the SOON badge on
+  disabled tiles floated to wherever the desc text ended (and on
+  short-desc tiles it visually touched the neighbour). Tiles are now
+  `flex flex-col h-full min-h-[128px]` and SOON uses `mt-auto pt-2
+  inline-block self-start` — pinned to the bottom-left of every
+  tile, equal-height across the row. Icons gained `shrink-0` and
+  the label gained `truncate` so no element can spill horizontally.
+
+### Files touched
+- `src/components/mission/MissionsKanban.jsx`
+- `src/components/mission/AgentActions.jsx`
+
+No server / schema / auth changes. v0.7.0 functionality identical
+under the hood.
+
 ## [0.7.0] — 2026-05-24
 
 ### Added — **Grant Tokens, live end-to-end**

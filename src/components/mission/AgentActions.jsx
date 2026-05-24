@@ -74,21 +74,25 @@ export default function AgentActions() {
             key={id}
             onClick={() => enabled && run(id)}
             disabled={!enabled || busy === id}
-            className={`group text-left rounded-xl p-3 border transition-all ${
+            className={`group text-left rounded-xl p-3 border transition-all flex flex-col h-full min-h-[128px] ${
               enabled
                 ? 'border-brand-accent/30 bg-brand-accent/5 hover:bg-brand-accent/10 hover:border-brand-accent/60 cursor-pointer'
                 : 'border-white/5 bg-white/[0.02] opacity-50 cursor-not-allowed'
             }`}
             title={desc}
           >
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1.5">
               {busy === id
-                ? <Loader className="w-4 h-4 animate-spin text-brand-accent" />
-                : <Icon className={`w-4 h-4 ${enabled ? 'text-brand-accent' : 'text-gray-500'}`} />}
-              <span className="text-xs font-bold text-white">{label}</span>
+                ? <Loader className="w-4 h-4 animate-spin text-brand-accent shrink-0" />
+                : <Icon className={`w-4 h-4 shrink-0 ${enabled ? 'text-brand-accent' : 'text-gray-500'}`} />}
+              <span className="text-xs font-bold text-white truncate">{label}</span>
             </div>
             <p className="text-[10px] text-gray-400 leading-snug">{desc}</p>
-            {!enabled && <span className="text-[9px] text-gray-600 font-mono uppercase tracking-wider mt-1 block">SOON</span>}
+            {!enabled && (
+              <span className="text-[9px] text-gray-600 font-mono uppercase tracking-wider mt-auto pt-2 inline-block self-start">
+                SOON
+              </span>
+            )}
           </button>
         ))}
       </div>
