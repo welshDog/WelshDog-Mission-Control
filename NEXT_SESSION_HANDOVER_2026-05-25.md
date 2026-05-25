@@ -1,5 +1,13 @@
 # Next Session Handover — 2026-05-25 (v2, post-trap-audit)
 
+> ⚠️ **SUPERSEDED by `NEXT_SESSION_HANDOVER_2026-05-26.md`** (2026-05-25 EOD).
+> Most priorities in this doc shipped that same evening: Refund v0.8.0
+> (`00c59ed`), render.yaml v0.8.0+ (`68c0a7a`), ActivityTicker v2 v0.9.0
+> (`3e7738f`). Read the 2026-05-26 handover for the current state; keep
+> this file as the historical record of the morning's reset.
+>
+> ---
+>
 > Read this FIRST. Every word. This is the live state.
 > v1 (Perplexity, ~01:30 BST) was reverse-engineered from in-flight state and
 > carried 4 stale items that mapped to already-done or already-corrected work.
