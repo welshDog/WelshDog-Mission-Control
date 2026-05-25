@@ -4,6 +4,70 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.9.0] — 2026-05-25
+
+### Changed — **ActivityTicker rebuilt on `mc_events` realtime (v2)**
+The v0.5.0 spine finally pays off in the UI. The ticker stops
+proxying state-table mutations and reads the actual audit log
+directly. Result: rich actor attribution, structured payload-aware
+summaries, and queryable history (same rows the audit trail uses).
+
+- **Primary stream — `mc_events`:**
+  - Initial load: `SELECT id, event_type, actor, payload, created_at
+    FROM mc_events ORDER BY created_at DESC LIMIT 50`. Empty-state
+    distinguished from loading-state.
+  - Realtime: INSERT subscription on the publication added in v0.5.0.
+    New rows prepend, dedup by `id` on echo.
+  - Per-event-type renderer with custom icon + accent + summary
+    pulled from structured payload:
+    - `straggler.dm_sent` → MessageSquare + cyan, "DM via {channel} → {email}"
+    - `tokens.granted` → Coins + emerald, "+{amount} BROski$ → {email}"
+    - `tokens.grant_skipped_duplicate` → Coins + amber, "Grant skipped (idempotent)"
+    - `refund.issued` → Undo2 + rose, "Refund {Intl-formatted amount} → {email}"
+    - `refund.failed` → AlertTriangle + rose
+    - `refund.token_deduction_failed` → ShieldAlert + amber
+    - Unknown event_types → Radio + raw type name (so future events
+      appear instantly, just unstyled — no code change needed to
+      surface a new event_type, only to style it)
+  - Each row carries a `title` attribute exposing the full event_type
+    + actor + ISO timestamp on hover (the structured detail without
+    cluttering the line).
+
+- **Fallback stream — `mc_missions`:**
+  - Three sources still don't emit `mc_events` rows: manual creation
+    (+ New button), drag-and-drop lane changes, Health Pulse /
+    Morning Brief auto-cards. We keep the mc_missions INSERT +
+    UPDATE + DELETE subscriptions for those.
+  - DEDUP: mc_missions INSERTs whose `signal_source` starts with
+    `catch_stragglers:` / `grant_tokens:` / `refund:` are SKIPPED —
+    the matching mc_events row will render with richer detail.
+    Extend `AGENT_ACTION_PREFIXES` when handover priority #4 lands
+    Pulse + Brief event emission.
+
+- **Dropped from v1:**
+  - `user_level_progress` subscription — student-side noise that
+    belongs on a per-student dashboard, not the ops feed.
+
+- **Preserved from v1:**
+  - `window.__mcExternalEventPush({ type, text })` — Socket.io /
+    external-channel events pipe in unchanged, render with Sparkles
+    + fuchsia.
+
+- **UX touches:**
+  - Bumped `MAX_EVENTS` 20 → 50 (the initial load already populates
+    that much, no reason to truncate sooner).
+  - Actor email shortened to local-part in the line (`· lyndzwills`),
+    full email shown in the hover title. Keeps the row tight.
+  - Loading state vs empty state distinguished so the operator knows
+    "still fetching" vs "really nothing has happened".
+
+### Files touched
+- `src/components/mission/ActivityTicker.jsx` (full rewrite, ~270 LOC,
+  was 113 LOC — extra weight is event-type rendering + dedup logic)
+
+No server / schema / auth changes. mc_events realtime publication
+was already live since v0.5.0.
+
 ## [0.8.0] — 2026-05-25
 
 ### Added — **Refund, live end-to-end (mirrors Grant Tokens v0.7.0)**
