@@ -13,6 +13,7 @@
 | Auth path end-to-end | ✅ Verified — JWT → requireAdmin → role check → Discord |
 | Rate limit lookup | ✅ Fixed — was failing on missing column |
 | Discord bot token sync | ✅ Resolved — Docker restart + `.env.local` aligned |
+| Vercel env vars | ✅ Done — all 6 vars added, build passed, deployed 01:37 BST |
 
 ---
 
@@ -22,9 +23,8 @@
 |---|---|---|
 | 🔴 1 | Wire `CatchStragglers.jsx` into Mission Control main panel | Backend proven, frontend wire-up next |
 | 🔴 2 | `mc_events` event sourcing migration | Schema exists, need full migration file committed |
-| 🟡 3 | Add `DISCORD_BOT_TOKEN` to Vercel env vars | Needed for production deploy |
-| 🟡 4 | Register `catch_stragglers` router in FastAPI `main.py` | HyperCode-V2.4 side |
-| 🟡 5 | Sprint 4 verify — `useAnonymousProgress` + `migrateAnonProgress` | Hyper-Vibe-Coding-Course |
+| 🟡 3 | Register `catch_stragglers` router in FastAPI `main.py` | HyperCode-V2.4 side |
+| 🟡 4 | Sprint 4 verify — `useAnonymousProgress` + `migrateAnonProgress` | Hyper-Vibe-Coding-Course |
 
 ---
 
@@ -33,7 +33,7 @@
 - **MC Server:** `npm run dev:full` on port 3011 — healthy
 - **Supabase:** `yhtmuibgdnxhbgboajhc` — migrations up to `add_mc_missions_signal_source_lane_title_notes`
 - **Docker:** 48 containers healthy, broski-bot healthy
-- **Vercel:** Not yet updated with `DISCORD_BOT_TOKEN`
+- **Vercel:** ✅ Deployed — env vars live (DISCORD_BOT_TOKEN, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_ADMIN_ALLOWLIST)
 
 ---
 
@@ -45,6 +45,7 @@
   JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))[1]).access_token
   ```
 - `npm run dev:full` starts two server instances if `node server/index.js` is already running — always use `dev:full` only
+- `/api/health` on Vercel — MC ops API runs server-side (Express), verify Vercel serverless handles it correctly on first prod test
 
 ---
 
