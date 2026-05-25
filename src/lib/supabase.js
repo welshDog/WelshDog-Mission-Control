@@ -319,6 +319,47 @@ export const grantTokens = async ({ userId, amount, reason, idempotencyKey }) =>
   return { status: res.status, ...payload }
 }
 
+// 💸 Refund — preview. Looks up the Stripe payment_intent + the
+// token_transactions row that originally awarded BROski$ for it, plus
+// the user's current balance. Returns canRefund + blocker so the UI
+// can decide whether to enable Confirm.
+export const previewRefund = async ({ paymentIntentId }) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    return { status: 401, success: false, error: 'no_session' }
+  }
+  const res = await fetch('/api/refund/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ paymentIntentId }),
+  })
+  const payload = await res.json().catch(() => ({}))
+  return { status: res.status, ...payload }
+}
+
+// 💸 Refund — commit. Runs Stripe refund (with Idempotency-Key) +
+// spend_tokens() deduction (matching p_source_id). Stable client-side
+// UUID per editing session → safe retries on both sides.
+export const runRefund = async ({ paymentIntentId, idempotencyKey }) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    return { status: 401, success: false, error: 'no_session' }
+  }
+  const res = await fetch('/api/refund', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ paymentIntentId, idempotencyKey }),
+  })
+  const payload = await res.json().catch(() => ({}))
+  return { status: res.status, ...payload }
+}
+
 // ☀️ Morning Brief — last-24h aggregate. Returns a plain object so the UI
 // can render it as a modal without leaking column-name assumptions.
 export const runMorningBrief = async () => {

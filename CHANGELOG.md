@@ -4,6 +4,118 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.8.0] — 2026-05-25
+
+### Added — **Refund, live end-to-end (mirrors Grant Tokens v0.7.0)**
+Fifth Agent Action shipped. Stripe charge refund + matching BROski$
+deduction in one operator click. Both sides idempotent — Stripe
+`Idempotency-Key` header AND `spend_tokens()` `p_source_id` use the
+same UUID per editing session, so double-clicks / retries are safe
+both ways.
+
+- **Two-step server flow:**
+  - `POST /api/refund/preview` (admin-only) — Stripe `GET /payment_intents/:id` +
+    `GET /refunds?payment_intent=...` (already-refunded check) +
+    `token_transactions` lookup (the row that awarded tokens for this
+    PI) + user balance. Returns `{ paymentIntent, refundedAmount,
+    refundable, tokensAwarded, user, canRefund, blocker }`.
+  - `POST /api/refund` (admin-only) — re-runs the preview checks
+    server-side (don't trust client state), then Stripe refund FIRST
+    (real money first, with `Idempotency-Key`), then `spend_tokens()`
+    with matching `p_source_id`.
+
+- **Raw Stripe REST — no SDK** (no new deps). Helper `stripeFetch()`
+  handles HTTP-Basic auth + form-encoded bodies + `Idempotency-Key`
+  header. Three Stripe endpoints called: `GET /payment_intents/:id`,
+  `GET /refunds?payment_intent=...`, `POST /refunds`.
+
+- **Pre-flight balance check** at preview AND re-checked at commit:
+  if `users.broski_tokens < tokensAwarded`, the UI's `canRefund`
+  flag goes false with a `blocker` string, and the server returns
+  `400 insufficient_balance_for_refund` if the operator somehow
+  bypasses the UI. Avoids the "Stripe refunded, tokens couldn't be
+  deducted" partial-failure trap on the common case.
+
+- **Partial-failure handling** for the rare case where pre-flight
+  passes but `spend_tokens()` still fails (e.g. balance changed in
+  the TOCTOU window): server emits `refund.token_deduction_failed`
+  event, writes an `investigating`-lane (NOT `shipped`) mc_missions
+  card with priority `p0`, returns `success: true` + `awarded: false`
+  + the spend_tokens error message. UI surfaces this clearly in the
+  success card with amber styling so the operator knows to reconcile
+  manually. The user still has their cash back; the token shortfall
+  is logged forever in `mc_events`.
+
+- **Audit pattern (same as v0.7.0 Grant Tokens):**
+  - `mc_missions` shipped-lane card (or `investigating` for the
+    partial-failure case). Owner stamped from JWT actor, priority
+    based on refund amount (`p1` for ≥ $50, `p2` otherwise, `p0`
+    for the partial-failure mission).
+  - `mc_events` row — `refund.issued` (clean) /
+    `refund.failed` (Stripe-side abort) /
+    `refund.token_deduction_failed` (Stripe ok, tokens not). All
+    rows carry the structured payload (paymentIntentId, refundId,
+    refundedAmount, currency, tokensDeducted, newBalance, userId,
+    email, idempotencyKey, sourceId).
+
+- **No token_transactions row found** = abort with
+  `404 no_token_award_found`. The server REFUSES to refund a Stripe
+  charge that has no corresponding token award — too easy to leave
+  the user with cash back AND tokens that were never associated
+  with the original purchase. The operator can still refund manually
+  via the Stripe dashboard for these edge cases.
+
+- **UI — `src/components/mission/Refund.jsx`** (~325 LOC):
+  - Two-step overlay: paste `pi_*` → **Preview refund** (verify) →
+    **Refund $X.XX** (commit). Live `pi_*` format check on input.
+  - Preview shows: recipient, Stripe amount + status, already-
+    refunded amount + count, tokens originally awarded, current
+    balance, projected after-refund balance.
+  - Confirm button disabled with tooltip when `!canRefund` — the
+    server-supplied `blocker` string surfaces as a red banner.
+  - Success state distinguishes clean refund (emerald) from
+    token-deduction-failed (amber + `ShieldAlert` + the
+    spend_tokens error inline).
+  - Esc-to-close disabled while a refund is in flight (real money
+    involved, never silently abort on a stray keystroke).
+  - `Intl.NumberFormat` for currency display (locale-aware symbol
+    + decimal placement), falls back to `<amount> <CURRENCY>` if
+    Intl rejects the currency code.
+
+- **Wiring:** AgentActions Refund tile flipped to `enabled: true`.
+  Live count `4/6 → 5/6`. Only `Drift Scan` remains as the
+  `enabled: false` tile.
+
+- **Env var added** (required for `/api/refund`):
+  - `STRIPE_SECRET_KEY` — same key the course's `stripe-webhook`
+    edge function uses. Server-only (no VITE_ prefix). Without it,
+    `/api/refund` returns `500 stripe_not_configured` and the boot
+    log surfaces ⚠️ `STRIPE_SECRET_KEY missing — /api/refund will 500`.
+
+### What this unblocks / what's next
+- All five Agent Actions are now end-to-end functional. Only
+  `Drift Scan` remains (re-runs the quiz true/false positional scan
+  from the May 18 fix; small in scope, but defer until we have a
+  drift signal to scan against).
+- **ActivityTicker v2** — three `mc_events` event types now flowing
+  in production (`straggler.dm_sent`, `tokens.granted`,
+  `refund.issued`) — enough variety to make a real Live Activity
+  feed meaningful. Next obvious commit.
+- **Vercel-Express deploy** — every Agent Action now writes audit
+  rows that need the server to be live for prod use. Picks up
+  pressure on choosing Render / Fly for the Express side (see
+  May 25 handover priority #2).
+
+### Sacred rules honoured
+- ✅ Stripe `Idempotency-Key` on every refund POST (the only safe
+  way to handle network retries against money-moving APIs).
+- ✅ `STRIPE_SECRET_KEY` is server-only — no `VITE_` prefix; never
+  reaches the browser.
+- ✅ `mc_events` writes still service-role-only; immutability
+  triggers from v0.5.0 cover this table.
+- ✅ JWT middleware + `requireAdmin` reused unchanged.
+- ✅ All env-only secrets remain so — no new VITE_* exposure.
+
 ## [0.7.1] — 2026-05-24
 
 ### Fixed — three layout bugs caught in pre-smoke review
