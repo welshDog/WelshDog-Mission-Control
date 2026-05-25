@@ -5,6 +5,7 @@ import AdminAuth from '../components/admin/AdminAuth'
 import MissionsKanban from '../components/mission/MissionsKanban'
 import AgentActions from '../components/mission/AgentActions'
 import ActivityTicker from '../components/mission/ActivityTicker'
+import CatchStragglers from '../components/mission/CatchStragglers'
 
 // MissionControl — the course-ops shell.
 // Top bar (live clock + health pill) → Agent Actions strip → Missions
@@ -14,6 +15,7 @@ export default function MissionControl() {
   const [session, setSession]         = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [now, setNow]                 = useState(new Date())
+  const [activePanel, setActivePanel] = useState(null)
 
   // --- Auth ---
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function MissionControl() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
         <main className="space-y-6">
           {/* Agents up top — most prominent slot */}
-          <AgentActions />
+          <AgentActions setActivePanel={setActivePanel} />
 
           {/* Missions Kanban — the closed-loop board */}
           <MissionsKanban />
@@ -113,10 +115,14 @@ export default function MissionControl() {
         </aside>
       </div>
 
+      {activePanel === 'stragglers' && (
+        <CatchStragglers onClose={() => setActivePanel(null)} />
+      )}
+
       {/* ── FOOTER ──────────────────────────────────────────────────────── */}
       <footer className="border-t border-white/10 px-6 py-3 text-[10px] text-gray-600 font-mono uppercase tracking-widest flex items-center justify-between">
         <span>🐶♾️ Mission Control · Vibe Coding Course Ops</span>
-        <span>Built for brains that don't switch off.</span>
+        <span>Built for brains that don&apos;t switch off.</span>
       </footer>
     </div>
   )

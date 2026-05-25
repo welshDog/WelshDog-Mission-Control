@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Stethoscope, Sunrise, UserCheck, Coins, Undo2, ScanSearch, Loader, X } from 'lucide-react'
 import { runHealthPulse, runMorningBrief } from '../../lib/supabase'
-import CatchStragglers from './CatchStragglers'
 import GrantTokens from './GrantTokens'
 import Refund from './Refund'
 
@@ -26,11 +25,10 @@ const ACTIONS = [
 
 const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
 
-export default function AgentActions() {
+ export default function AgentActions({ setActivePanel }) {
   const [busy, setBusy]               = useState(null)  // action id currently running
   const [result, setResult]           = useState(null)  // { id, payload }
   const [error, setError]             = useState(null)
-  const [showStragglers, setShowStr]  = useState(false) // overlay visibility
   const [showGrant, setShowGrant]     = useState(false) // grant overlay visibility
   const [showRefund, setShowRefund]   = useState(false) // refund overlay visibility
 
@@ -40,7 +38,7 @@ export default function AgentActions() {
     // Send action inside the overlay (server/index.js), so we don't
     // double-log here.
     if (id === 'stragglers') {
-      setShowStr(true)
+      setActivePanel('stragglers')
       return
     }
     if (id === 'grant') {
@@ -182,9 +180,6 @@ export default function AgentActions() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Catch Stragglers — full-screen overlay (its own AnimatePresence) */}
-      {showStragglers && <CatchStragglers onClose={() => setShowStr(false)} />}
 
       {/* Grant Tokens — modal overlay (its own AnimatePresence) */}
       {showGrant && <GrantTokens onClose={() => setShowGrant(false)} />}
