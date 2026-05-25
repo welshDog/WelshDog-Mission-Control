@@ -65,7 +65,10 @@ if (missing.length > 0) {
   // We still boot so /api/health works for diagnostic; /api/send-dm will 500.
 }
 
-const PORT = Number(process.env.API_PORT) || 3011
+// PORT resolution: Render (and most PaaS) auto-injects PORT and
+// requires the service to bind to it. Falls back to API_PORT for
+// existing local setups, then to 3011 as the dev default.
+const PORT = Number(process.env.PORT) || Number(process.env.API_PORT) || 3011
 const DISCORD_API = 'https://discord.com/api/v10'
 const RATE_LIMIT_MS = 24 * 60 * 60 * 1000
 

@@ -1,0 +1,89 @@
+# Render Blueprint — WelshDog Mission Control's Express ops API.
+#
+# WHAT THIS DEPLOYS
+#   `node server/index.js` — the same Express app you've been running
+#   locally on :3011. Endpoints: /api/health, /api/send-dm,
+#   /api/grant-tokens/preview + commit, /api/refund/preview + commit.
+#
+# WHAT THIS DOES *NOT* DEPLOY
+#   The Vite SPA (the `dist/` bundle). The SPA stays on Vercel. This
+#   blueprint is ONLY the Express side that Vercel cannot host as a
+#   long-lived process.
+#
+# WIRING IT TO THE SPA
+#   After Render gives you a URL like `https://welshdog-mc-api.onrender.com`,
+#   you've got two options for getting the SPA to talk to it:
+#
+#   Option A (recommended) — Vercel rewrites. Add to MC's `vercel.json`:
+#     { "rewrites": [
+#         { "source": "/api/:path*",
+#           "destination": "https://welshdog-mc-api.onrender.com/api/:path*" }
+#     ]}
+#   Then no client code changes — `fetch('/api/send-dm')` keeps working
+#   because Vercel proxies same-origin to Render. CORS becomes a
+#   non-issue (browser sees same origin). One hop of latency.
+#
+#   Option B — client env var. Add `VITE_MC_API_URL` to MC's Vercel
+#   env, rewrite every `fetch('/api/...')` in src/lib/supabase.js to
+#   prefix it. More code, more flexibility (multiple environments).
+#
+# RENDER FREE PLAN GOTCHA
+#   Free instances spin down after 15 min of inactivity, then take
+#   ~30s to wake up on the next request. Fine for ops use (operator
+#   clicks an Agent Action, waits, it works). Bump to Starter ($7/mo)
+#   if cold-starts hurt the workflow.
+#
+# DEPLOY
+#   1. Render dashboard → New → Blueprint → connect GitHub →
+#      welshDog/WelshDog-Mission-Control → main branch.
+#   2. Set the `sync: false` env vars from the dashboard (Stripe,
+#      Discord, Supabase). These intentionally don't live in this
+#      file — secrets stay out of git.
+#   3. First deploy ~3 min. Hit /api/health to confirm:
+#      `curl https://<your-service>.onrender.com/api/health`
+#      Should return `{ ok: true, ... }`.
+
+services:
+  - type: web
+    name: welshdog-mc-api
+    runtime: node
+    plan: free                  # bump to `starter` ($7/mo) to kill cold-starts
+    region: oregon              # change if you want EU latency (frankfurt available)
+    branch: main
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+    envVars:
+      # Render injects PORT dynamically; server reads it (see PORT fallback
+      # in server/index.js: process.env.PORT || process.env.API_PORT || 3011).
+      - key: NODE_ENV
+        value: production
+
+      # CORS allowlist — set this to MC's Vercel SPA URL when you know it.
+      # Comma-separated for multiple origins.
+      # Example: https://welshdog-mission-control.vercel.app
+      - key: API_CORS_ORIGINS
+        sync: false
+
+      # Required for /api/send-dm (Catch Stragglers).
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+
+      # Required for /api/send-dm audit + /api/grant-tokens + /api/refund.
+      # Server-only — bypasses RLS. Never expose to the browser.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Grant Tokens hard cap (catches finger-trouble; optional, defaults to 10000).
+      - key: MAX_GRANT_PER_CALL
+        value: "10000"
+
+      # Required for /api/refund. Same key the course's stripe-webhook
+      # edge function uses. In dev sk_test_..., in prod sk_live_...
+      - key: STRIPE_SECRET_KEY
+        sync: false
