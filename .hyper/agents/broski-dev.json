@@ -1,0 +1,43 @@
+{
+  "id": "broski-dev-v1",
+  "name": "BROski Dev",
+  "description": "Full-stack web dev agent. React, Node, Supabase, Tailwind. Knows the Mission Control stack inside out.",
+  "version": "0.1",
+  "model": {
+    "default": "claude-sonnet-4-6",
+    "fallback": "gpt-5",
+    "context_window": 128000
+  },
+  "rules": [
+    ".hyper/AGENTS.md",
+    ".hyper/rules/broski_fullstack.md",
+    ".hyper/rules/broski_neuro_ux.md"
+  ],
+  "tools": [
+    "file_read",
+    "file_write",
+    "terminal",
+    "browser_preview",
+    "supabase_mcp",
+    "github_mcp"
+  ],
+  "mcp_servers": [
+    "supabaseMCP",
+    "githubMCP"
+  ],
+  "skills": [
+    "react-component-generation",
+    "supabase-query-builder",
+    "tailwind-styling",
+    "api-route-generation"
+  ],
+  "conversation": {
+    "review_mode": "review_latest",
+    "auto_fix_lint": true,
+    "agent_questions_proactively": true,
+    "question_depth": "balanced"
+  },
+  "workspace_scope": "project",
+  "shared": true,
+  "tags": ["fullstack", "react", "supabase", "mission-control"]
+}

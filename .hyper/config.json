@@ -1,0 +1,59 @@
+{
+  "_comment": "BROski Hyper Config v0.1 — project-level settings for Mission Control",
+  "project": {
+    "name": "WelshDog Mission Control",
+    "version": "0.1",
+    "stack": ["react", "vite", "tailwind", "supabase", "javascript"]
+  },
+  "ui": {
+    "theme": "hyper_dark",
+    "font_size": 14,
+    "font_family": "JetBrains Mono",
+    "line_wrap": true,
+    "minimap": false,
+    "language": "en"
+  },
+  "editor": {
+    "keymap": "vscode",
+    "markdown_view": "split",
+    "auto_format_on_save": true
+  },
+  "conversation": {
+    "todo_panel": true,
+    "auto_fold_completed": true,
+    "auto_fix_lint": true,
+    "agent_questions_proactively": true,
+    "question_depth": "balanced",
+    "review_mode": "review_latest",
+    "jump_to_next_change": true,
+    "auto_run_mcp": true,
+    "command_mode": "sandbox_allowlist",
+    "notify_task_complete": true,
+    "notify_task_needs_attention": true,
+    "notify_task_failed": true,
+    "sound_task_complete": "broski_ding",
+    "sound_task_failed": "broski_alarm"
+  },
+  "context": {
+    "index_enabled": true,
+    "index_scope": "workspace",
+    "ignore_patterns": [
+      ".hyper/**",
+      "dist/**",
+      "node_modules/**",
+      "*.lock",
+      ".git/**",
+      "coverage/**"
+    ]
+  },
+  "cue": {
+    "tab_completion": true,
+    "smart_import": true,
+    "smart_rename": true
+  },
+  "privacy": {
+    "hard_mode": false,
+    "store_conversations": true,
+    "used_for_training": false
+  }
+}

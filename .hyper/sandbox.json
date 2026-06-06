@@ -1,0 +1,61 @@
+{
+  "_comment": "BROski Sandbox Policy v0.1 — controls what agents can touch on disk + network",
+  "filesystem": {
+    "readWrite": [
+      "$WORKSPACE_FOLDER",
+      "$TMPDIR",
+      "~/.local/lib",
+      "~/.bun",
+      "~/.npm",
+      "~/.cache"
+    ],
+    "readOnly": [
+      "/",
+      "~/.ssh",
+      "~/.aws",
+      "~/.hyper",
+      ".git",
+      "~/.gnupg"
+    ]
+  },
+  "network": {
+    "default": "deny",
+    "allow": [
+      "*.github.com:443",
+      "*.supabase.co:443",
+      "*.supabase.io:443",
+      "registry.npmjs.org:443",
+      "pypi.org:443",
+      "*.vercel.app:443",
+      "*.render.com:443",
+      "api.stripe.com:443",
+      "*.railway.app:443"
+    ],
+    "deny": [
+      "10.0.0.0/8",
+      "192.168.0.0/16",
+      "172.16.0.0/12"
+    ]
+  },
+  "commands": {
+    "allowlist": [
+      "git",
+      "bun",
+      "npm run",
+      "npx",
+      "docker compose",
+      "supabase",
+      "vercel",
+      "railway"
+    ],
+    "high_risk_patterns": [
+      "rm -rf",
+      "sudo rm",
+      "DROP TABLE",
+      "format ",
+      "mkfs",
+      "dd if="
+    ],
+    "high_risk_action": "always_prompt"
+  }
+}

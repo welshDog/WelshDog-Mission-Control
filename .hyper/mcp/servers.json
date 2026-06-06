@@ -1,0 +1,56 @@
+{
+  "_comment": "BROski MCP Hub — registered MCP servers for Mission Control workspace",
+  "servers": [
+    {
+      "id": "githubMCP",
+      "name": "GitHub MCP",
+      "transport": "stdio",
+      "command": "npx -y @modelcontextprotocol/server-github",
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"
+      },
+      "enabled": true,
+      "workspace_scope": "global",
+      "log_level": "info",
+      "description": "GitHub repos, issues, PRs, commits — full MCP access"
+    },
+    {
+      "id": "supabaseMCP",
+      "name": "Supabase MCP",
+      "transport": "stdio",
+      "command": "npx -y @supabase/mcp-server-supabase",
+      "env": {
+        "SUPABASE_URL": "$SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY": "$SUPABASE_SERVICE_ROLE_KEY"
+      },
+      "enabled": true,
+      "workspace_scope": "project",
+      "log_level": "info",
+      "description": "Supabase DB queries, schema introspection, edge function management"
+    },
+    {
+      "id": "stripeMCP",
+      "name": "Stripe MCP",
+      "transport": "stdio",
+      "command": "npx -y @stripe/mcp-server",
+      "env": {
+        "STRIPE_SECRET_KEY": "$STRIPE_SECRET_KEY"
+      },
+      "enabled": false,
+      "workspace_scope": "project",
+      "log_level": "error",
+      "description": "Stripe payments, customers, webhooks — enable only when working on billing features",
+      "notes": "Stripe webhook endpoint is ALWAYS rate-limit exempt — never add to rate limiter"
+    },
+    {
+      "id": "filesystemMCP",
+      "name": "Filesystem MCP",
+      "transport": "stdio",
+      "command": "npx -y @modelcontextprotocol/server-filesystem $WORKSPACE_FOLDER",
+      "enabled": true,
+      "workspace_scope": "project",
+      "log_level": "error",
+      "description": "Local filesystem access scoped to workspace folder"
+    }
+  ]
+}
