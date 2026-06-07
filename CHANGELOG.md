@@ -4,6 +4,21 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.9.1] — 2026-06-07
+
+### Removed — **dead `zustand` dependency**
+`zustand@^4.4.0` was declared in `package.json` but never imported
+anywhere in the MC source — the server is Express and the frontend
+uses React Context / hooks, with no zustand store. Removed it to slim
+the dependency tree (no runtime or build impact; nothing referenced it).
+
+> Context: the 2026-06-07 morning handover listed a "Zustand
+> default-export deprecation" fix "across the frontend codebase." That
+> task does **not** apply to MC — MC had no zustand usage at all, and
+> every real zustand store elsewhere in the ecosystem (Course, V2.4
+> dashboard) already uses the named `import { create } from 'zustand'`
+> form. Nothing to migrate; the only MC action was deleting the unused dep.
+
 ## [0.9.0] — 2026-05-25
 
 ### Changed — **ActivityTicker rebuilt on `mc_events` realtime (v2)**
