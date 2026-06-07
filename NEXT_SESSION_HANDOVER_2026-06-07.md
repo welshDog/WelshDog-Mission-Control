@@ -1,51 +1,50 @@
-# NEXT SESSION HANDOVER — 2026-06-07 (Evening Session)
+# NEXT SESSION HANDOVER — 2026-06-07 (FINAL — reconciled)
 
-**Session executed:** Vercel blank screen fix + full ecosystem health check (GitHub / Vercel / Mission Control)
-**Workspace:** `WelshDog-Mission-Control` (Vercel + GitHub wiring only — no code changes this session)
+**Session executed:** Vercel blank screen fix + Agents IDE fix + full ecosystem health check
+**Workspace:** `WelshDog-Mission-Control` + `hyper-agents-ide` (Vercel/Render config + StatusChips fix)
 **Supabase project:** `yhtmuibgdnxhbgboajhc` (shared — Hyper Vibe Course + Mission Control)
 
-> 📌 Live truth: Mission Control is now LIVE and authenticated. Everything below is verified against the running deployment.
+> 📌 Live truth: Mission Control is CONFIRMED LIVE with hard bundle proof. Everything below verified against the running production build.
 
 ---
 
 ## 🎯 WHAT GOT DONE THIS SESSION
 
-### 1. Mission Control Vercel blank screen — FIXED ✅
+### 1. Mission Control Vercel blank screen — FIXED + CONFIRMED ✅
 
-**Root cause confirmed:**
-- Live bundle had no Supabase credentials baked in at build time.
-- Console error: `supabaseUrl is required` — `createClient()` crashing before UI mounted.
-- Vite inlines `import.meta.env.VITE_*` at build time — missing vars = silent blank screen.
+**Root cause:** `VITE_SUPABASE_URL` missing from Vercel Production env vars — Vite inlines `import.meta.env.VITE_*` at build time, missing = `undefined` = `supabaseUrl is required` crash before UI mounts.
 
-**What was wrong:**
-- `VITE_SUPABASE_URL` was either missing or incorrectly named in Vercel Production env vars.
-- Build cache was preserving the old bad bundle even after vars were added.
+**Fix:** Set correct Production env vars in Vercel + redeployed with **Use existing Build Cache = OFF**.
 
-**Fix applied:**
-- Confirmed correct env vars set in Vercel Production:
-  - `VITE_SUPABASE_URL` = `https://yhtmuibgdnxhbgboajhc.supabase.co`
-  - `VITE_SUPABASE_ANON_KEY` = (anon public key)
-  - `VITE_ADMIN_ALLOWLIST` = `lyndzwills@gmail.com`
-- Redeployed Production with **Use existing Build Cache = OFF**.
-- Fresh build forced Vite to inline correct vars.
+**Hard bundle proof (current prod `index-Ed0IDLRl.js`):**
+
+| Check | Result |
+|---|---|
+| `.supabase.co` baked in | ✅ Yes |
+| Project ref `yhtmuibgdnxhbgboajhc` | ✅ Yes |
+| `VITE_ADMIN_ALLOWLIST = lyndzwills@gmail.com` | ✅ Yes — login works |
+| `"Supabase credentials missing"` error string | ✅ Gone (dead-code-eliminated — clincher) |
+
+Dead-code elimination of the error branch = `VITE_SUPABASE_URL` is a truthy build-time constant. Hard proof.
 
 **Verified live:**
-- `https://welsh-dog-mission-control-5y9e7kbiu-bro-skis.vercel.app/` now renders `Restricted Access` auth gate correctly.
-- Admin login confirmed working — full Mission Control dashboard mounts.
+- Auth gate renders correctly. Admin login confirmed.
 - `ALL SYSTEMS GO` health pill visible. Agent Actions strip live (5/6).
 
-### 2. Vercel account / GitHub repo wiring — CONFIRMED ✅
+### 2. Hyper Agents IDE — FIXED ✅ (commit `39eff02`)
 
-- Vercel project `welsh-dog-mission-control` is on the **BROskis** Hobby account (`bro-skis`).
-- Connected to correct GitHub repo: `welshDog/WelshDog-Mission-Control` ✅
-- Note: `welsh-dog-mission-control` does NOT appear in the BROskis Vercel team API — it's under a personal account scope, not the team. This is fine — it's working. Don't move it unless there's a reason to.
+- Was stuck showing `LOCAL/DEV` StatusChips incorrectly.
+- **Real fix:** honest StatusChips (`39eff02`) + removed `ADMIN_TOKEN` to make it public.
+- `VITE_API_URL` framing was a red herring — relative `/api/*` + same-origin means it was always a no-op.
+- **Status: done. Do NOT add `VITE_API_URL` to Render — it won't help.**
 
 ### 3. Full ecosystem health check — DONE ✅
 
 | Service | Status |
 |---|---|
-| MC Frontend (Vercel) | ✅ Live + authenticated |
+| MC Frontend (Vercel) | ✅ Live + authenticated + bundle confirmed |
 | MC API (Render) | ✅ `https://welshdog-mc-api.onrender.com` |
+| Hyper Agents IDE (Render) | ✅ Fixed (StatusChips honest, public) |
 | hyper-vibe-coding-course (Vercel) | ✅ Live |
 | GitHub @welshDog | ✅ 88 repos, HyperCode-V2.4 pushed today |
 | Supabase `yhtmuibgdnxhbgboajhc` | ✅ Tables confirmed, RLS active, 2 advisors parked |
@@ -55,50 +54,36 @@
 ## 🟢 SYSTEM STATE AT SESSION END
 
 ### Mission Control (this repo)
-- **Deployed:** ✅ Production live on Vercel
-- **Auth gate:** ✅ Working — `AdminAuth` renders + Supabase session confirmed
+- **Deployed:** ✅ Production live on Vercel — bundle confirmed
+- **Auth gate:** ✅ Working
 - **Dashboard:** ✅ Full shell mounts post-auth
-- **Agent Actions:** ✅ 5/6 live (Drift Scan still SOON)
-- **No code changes this session** — Vercel config fix only
-
-### GitHub — @welshDog
-- **Total repos:** 88 (81 public, 7 private)
-- **HyperCode-V2.4:** Last pushed today (Jun 07) ✅
-- **Archived repos:** 3 (BROski-Chores-App, HyperCode-V2.0, HYPERcode-V2) — all intentional
-- **Open issues on HyperCode-V2.4:** 117 — most are labelled `shipped` release notes. Not a crisis. Worth a triage pass next time.
-
-### Vercel — BROskis team
-- **hyper-vibe-coding-course:** ✅ Present in BROskis team
-- **welsh-dog-mission-control:** ⚠️ On personal account scope — working fine, just not visible via team API
+- **Agent Actions:** 5/6 live — only Drift Scan remains (correctly deferred)
+- **No feature code changes this session** — Vercel config fix + handover only
 
 ### Supabase (`yhtmuibgdnxhbgboajhc`)
-- Shared between Mission Control + Hyper Vibe Course
-- Tables confirmed: `users`, `mc_missions`, `mc_events`
-- RLS + immutability triggers on `mc_events` — confirmed active
-- 2 security advisors intentionally parked (from previous session)
+- Tables: `users`, `mc_missions`, `mc_events`
+- RLS + immutability triggers on `mc_events` — active
+- 2 security advisors parked (intentional from previous session)
 
 ---
 
-## 📋 IMMEDIATE NEXT TASKS (ranked)
+## 📋 IMMEDIATE NEXT TASKS (ranked + corrected)
 
-### 1. Drift Scan (6th Agent Action tile)
-- Only remaining tile — currently `SOON`
+### 1. Health Pulse + Morning Brief → mc_events emitters
+- Both still poll-based — not yet emitting `pulse.completed` / `brief.completed` events
+- Adding these lets ActivityTicker show them — clean self-contained finish line
+- **Suggested next task**
+
+### 2. Drift Scan (6th Agent Action tile)
+- Only remaining Agent Actions tile — currently `SOON`
 - Defer until there's a real drift signal to scan against
 
-### 2. Health Pulse + Morning Brief → mc_events emitters
-- Both still poll-based — not yet emitting `pulse.completed` / `brief.completed` events
-- Low priority but clean finish line for ActivityTicker
+### 3. HyperCode-V2.4 issues triage
+- 117 open issues — most labelled `shipped` release notes
+- Hygiene pass when there's a quiet moment
 
-### 3. Hyper Agents IDE on Render
-- Still stuck in `LOCAL/DEV` mode — needs `VITE_API_URL` set in Render env vars
-- Carried over from previous session
-
-### 4. HyperCode-V2.4 issues triage
-- 117 open issues — most are labelled tasks/release notes
-- Quick pass to close stale/shipped ones = good hygiene
-
-### 5. Leaked-password protection (Supabase)
-- One toggle: Supabase → Auth → Providers → Password → enable HaveIBeenPwned
+### 4. Supabase leaked-password protection
+- One toggle: Supabase → Auth → Providers → Password → HaveIBeenPwned
 - Parked pending funds
 
 ---
@@ -107,37 +92,27 @@
 
 | Gotcha | Lesson |
 |---|---|
-| Vite blank screen = missing build-time vars | `import.meta.env.VITE_*` is baked at build — missing = undefined = crash. Smoking gun: `supabaseUrl is required` in console. |
+| Vite blank screen = missing build-time vars | `import.meta.env.VITE_*` baked at build — missing = crash. Smoking gun: `supabaseUrl is required`. |
 | Vercel build cache preserves bad bundles | After fixing env vars, always redeploy with **Use existing Build Cache = OFF**. |
-| `welsh-dog-mission-control` not in BROskis Vercel team API | Works fine — just on personal account scope. Don't panic or move it. |
-| `VITE_SUPABASE_URL` display truncation in Vercel UI | Long var names get clipped in the list view. Always click in to verify the exact key name. |
-
----
-
-## 🗂️ FILES MODIFIED THIS SESSION
-
-| File | Change |
-|---|---|
-| Vercel env vars (no repo file) | Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ADMIN_ALLOWLIST` in Production |
-| `NEXT_SESSION_HANDOVER_2026-06-07.md` | Updated (this file) |
-
-> No feature code commits this session — Vercel config fix + handover only.
+| Dead-code elimination = hard proof of baked var | If the error branch is gone from the bundle, the var was truthy at build time. Clincher check. |
+| `VITE_API_URL` on Render was a no-op for Agents IDE | Relative `/api/*` + same-origin — never needed it. Real fix was honest StatusChips. |
+| Both sides can be stale | Doc ran ahead of reality early in session; reality ran ahead of Claude's snapshot late in session. Always re-verify live. |
 
 ---
 
 ## 🏁 SESSION CHECKLIST
 
-- [x] Mission Control blank screen fixed + verified live
-- [x] Correct GitHub repo + Vercel account confirmed
+- [x] Mission Control blank screen fixed + bundle-confirmed live
+- [x] Agents IDE LOCAL/DEV status fixed (commit `39eff02`)
 - [x] Full health check run (GitHub / Vercel / Supabase)
-- [x] Handover updated + pushed
-- [ ] Drift Scan (6th tile) — next feature session
+- [x] Handover reconciled + pushed (single source of truth)
+- [ ] Health Pulse + Morning Brief → mc_events emitters — next session
 
 ---
 
 ## 🎯 ONE SENTENCE FOR NEXT SESSION
 
-"Mission Control is fully live and authenticated on Vercel — next build task is Drift Scan (6th Agent Action tile), or fix Hyper Agents IDE LOCAL/DEV mode on Render if that's the priority."
+"Mission Control is confirmed live with hard bundle proof — next task is wiring Health Pulse + Morning Brief as `mc_events` emitters so ActivityTicker shows them too."
 
 ---
 
