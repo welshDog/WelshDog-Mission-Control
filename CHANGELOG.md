@@ -4,6 +4,31 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.10.0] — 2026-06-07
+
+### Added — **Health Pulse + Morning Brief emit `mc_events`**
+The last two Agent Actions that didn't feed the audit spine now do. Both
+run client-side (read-only queries via the anon client), but `mc_events`
+INSERT is **service-role-only** by design — so the browser can't write its
+own audit row. A new thin endpoint bridges that safely.
+
+- **`POST /api/activity`** (`requireAdmin`) — maps `kind: 'pulse' | 'brief'`
+  to an `event_type` from a **server-side whitelist** (the client never
+  sends a raw `event_type`, so a compromised session can't inject arbitrary
+  audit types), stamps the **verified actor** (`req.user.email`), coerces the
+  `summary` to bounded non-negative integers, and emits via the shared
+  service-role `emitEvent` helper.
+- **`recordActivity(kind, summary)`** (`src/lib/supabase.js`) — best-effort
+  client helper; attaches the session bearer and never throws (a failed
+  audit log must not break an action the operator already saw succeed).
+- **`AgentActions`** fires `recordActivity` after Health Pulse / Morning
+  Brief complete: `pulse.completed` (`{ createdCount, scanned, skipped }`)
+  and `brief.completed` (`{ rowCount, skipped }`).
+- **`ActivityTicker`** gains renderers for both (`Stethoscope` / `Sunrise`),
+  and `health_pulse:` joins `AGENT_ACTION_PREFIXES` so the per-card mission
+  INSERTs Health Pulse creates no longer double-appear next to the summary
+  line (Morning Brief creates no card, so it needs no prefix).
+
 ## [0.9.1] — 2026-06-07
 
 ### Removed — **dead `zustand` dependency**

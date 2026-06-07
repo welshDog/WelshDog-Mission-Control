@@ -390,3 +390,28 @@ export const runMorningBrief = async () => {
 
   return { rows, skipped, generatedAt: new Date() }
 }
+
+// 📡 Record a completed frontend-run agent action (Health Pulse / Morning
+// Brief) into mc_events — via the MC API, because mc_events INSERT is
+// service-role-only (the browser can't write its own audit row). The
+// server maps `kind` → event_type from a whitelist and stamps the verified
+// actor. Best-effort: never throws — a failed audit log must NOT break the
+// action the operator already saw succeed.
+export const recordActivity = async (kind, summary = {}) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return { ok: false, error: 'no_session' }
+    const res = await fetch('/api/activity', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ kind, summary }),
+    })
+    return { ok: res.ok }
+  } catch (e) {
+    console.error('recordActivity failed:', e)
+    return { ok: false, error: e?.message || 'request_failed' }
+  }
+}

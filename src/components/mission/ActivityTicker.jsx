@@ -49,6 +49,8 @@ import {
   Edit3,
   Trash2,
   Sparkles,
+  Stethoscope,
+  Sunrise,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -58,7 +60,11 @@ const MAX_EVENTS = 50
 // also have a corresponding mc_events row — skip in the fallback
 // stream to avoid duplicates. Extend this when new Agent Actions
 // land (Health Pulse + Morning Brief will join in priority #4).
-const AGENT_ACTION_PREFIXES = ['catch_stragglers:', 'grant_tokens:', 'refund:']
+// `health_pulse:` joined here once Health Pulse started emitting a
+// `pulse.completed` mc_events summary — the per-card mission INSERTs it
+// creates would otherwise double-appear alongside the summary line.
+// (Morning Brief creates no mission card, so it needs no prefix.)
+const AGENT_ACTION_PREFIXES = ['catch_stragglers:', 'grant_tokens:', 'refund:', 'health_pulse:']
 
 const isAgentActionMission = (signalSource) =>
   typeof signalSource === 'string' &&
@@ -137,6 +143,22 @@ const renderEvent = ({ event_type, payload }) => {
         Icon: ShieldAlert,
         accent: 'text-amber-300',
         text: `Refund ${amt || ''} OK but tokens NOT deducted → ${shortUser(p)}`,
+      }
+    }
+    case 'pulse.completed': {
+      const n = p.createdCount ?? 0
+      return {
+        Icon: Stethoscope,
+        accent: 'text-sky-300',
+        text: `Health Pulse · ${n} card${n === 1 ? '' : 's'} created`,
+      }
+    }
+    case 'brief.completed': {
+      const n = p.rowCount ?? 0
+      return {
+        Icon: Sunrise,
+        accent: 'text-amber-200',
+        text: `Morning Brief · ${n} signal${n === 1 ? '' : 's'} (24h)`,
       }
     }
     default:

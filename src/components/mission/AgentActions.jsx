@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Stethoscope, Sunrise, UserCheck, Coins, Undo2, ScanSearch, Loader, X } from 'lucide-react'
-import { runHealthPulse, runMorningBrief } from '../../lib/supabase'
+import { runHealthPulse, runMorningBrief, recordActivity } from '../../lib/supabase'
 import GrantTokens from './GrantTokens'
 import Refund from './Refund'
 
@@ -55,9 +55,20 @@ const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
       if (id === 'pulse') {
         const out = await runHealthPulse()
         setResult({ id, payload: out })
+        // Best-effort audit into mc_events (fire-and-forget — never blocks
+        // or fails the result the operator already sees).
+        recordActivity('pulse', {
+          createdCount: out.createdCount,
+          scanned: out.scanned.length,
+          skipped: out.skipped.length,
+        })
       } else if (id === 'brief') {
         const out = await runMorningBrief()
         setResult({ id, payload: out })
+        recordActivity('brief', {
+          rowCount: out.rows.length,
+          skipped: out.skipped.length,
+        })
       }
     } catch (e) {
       setError(e?.message || 'Action failed')
