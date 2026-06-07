@@ -4,6 +4,28 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.10.1] — 2026-06-07
+
+### Fixed — **Health Pulse schema errors (mc_missions + user_level_progress)**
+Running Health Pulse threw two schema errors, both from the live DB having
+drifted from the repo's assumptions (verified against `yhtmuibgdnxhbgboajhc`):
+
+- **`mc_missions.mission_type` NOT-NULL violation.** The column is `NOT NULL`
+  with no default, but `createMission` never set it — so *every* insert
+  silently failed (the table was empty). A prior session had labelled
+  `mission_type`/`user_id`/`status`/`metadata` "phantom columns from a dead
+  course branch" and ignored them; they're actually live. `createMission` now
+  takes a `mission_type` (default `'manual'`); Health Pulse passes
+  `'health_pulse'`. Verified with a transactional dry-run insert.
+- **`user_level_progress.level` does not exist.** Nor does `completed_at`. The
+  table is one row per student (`completed_levels int[]`, `xp`, `badges`,
+  `updated_at`). The "stuck students" query now uses real columns and detects
+  *no progress update in >7 days* via `updated_at`. Verified against live data.
+
+> ⚠️ Same latent `mission_type` NOT-NULL bug still affects the **server-side**
+> `mc_missions` audit inserts (grant / refund / send-dm) and `snoozeStraggler`
+> — their Kanban cards have been silently failing too. Tracked for a follow-up.
+
 ## [0.10.0] — 2026-06-07
 
 ### Added — **Health Pulse + Morning Brief emit `mc_events`**

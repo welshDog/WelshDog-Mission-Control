@@ -33,10 +33,14 @@ export const fetchMissions = async (limit = 200) => {
   return data || []
 }
 
-export const createMission = async ({ title, signal_source = 'manual', notes = null, lane = 'detected' }) => {
+// `mission_type` is NOT NULL on mc_missions (live schema — it was once
+// mistakenly treated as a "phantom column" and left unset, which silently
+// failed every insert). Defaults to 'manual' for the +New button; callers
+// like Health Pulse pass their own category.
+export const createMission = async ({ title, signal_source = 'manual', notes = null, lane = 'detected', mission_type = 'manual' }) => {
   const { data, error } = await supabase
     .from('mc_missions')
-    .insert([{ title, signal_source, notes, lane }])
+    .insert([{ title, signal_source, notes, lane, mission_type }])
     .select()
   if (error) {
     console.error('createMission failed:', error)
@@ -84,19 +88,23 @@ export const runHealthPulse = async () => {
   // --- Signal: students stuck >7d on a level (probes user_level_progress).
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // "Stuck" = no progress update in >7 days. user_level_progress is one
+    // row per student (completed_levels int[] + xp + badges + updated_at) —
+    // there is NO per-level row and NO completed_at column, so idle-by-
+    // updated_at is the real signal on this schema.
     const { data, error } = await supabase
       .from('user_level_progress')
-      .select('user_id, level, updated_at', { count: 'exact' })
+      .select('user_id, completed_levels, updated_at')
       .lt('updated_at', sevenDaysAgo)
-      .is('completed_at', null)
       .limit(50)
     if (error) throw error
     scanned.push('user_level_progress')
     if (data && data.length > 0) {
       await createMission({
-        title: `${data.length} student${data.length === 1 ? '' : 's'} stuck >7d on a level`,
+        title: `${data.length} student${data.length === 1 ? '' : 's'} with no progress in >7 days`,
         signal_source: 'health_pulse:stuck_students',
-        notes: `Found ${data.length} user_level_progress rows with no completed_at and idle >7 days.`,
+        mission_type: 'health_pulse',
+        notes: `Found ${data.length} user_level_progress row${data.length === 1 ? '' : 's'} whose updated_at is older than 7 days (no level/xp progress).`,
       })
       createdCount += 1
     }
@@ -118,6 +126,7 @@ export const runHealthPulse = async () => {
       await createMission({
         title: `Health Pulse · ${new Date().toLocaleString()}`,
         signal_source: 'health_pulse:heartbeat',
+        mission_type: 'health_pulse',
         notes: 'Quiet day — no new signals tripped. This heartbeat card confirms the pulse ran.',
       })
       createdCount += 1
