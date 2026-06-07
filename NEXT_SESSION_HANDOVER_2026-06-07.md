@@ -38,6 +38,12 @@ Dead-code elimination of the error branch = `VITE_SUPABASE_URL` is a truthy buil
 - `VITE_API_URL` framing was a red herring — relative `/api/*` + same-origin means it was always a no-op.
 - **Status: done. Do NOT add `VITE_API_URL` to Render — it won't help.**
 
+### 2b. Local HyperCode IDE "52% error rate" — RESOLVED ✅
+- Not a broken stack — the orchestrator health roster was counting **10 stopped orphan containers** (ad-hoc `docker run` + `compose run` one-offs + 1 replaced pyroscope) as "down services." `docker rm`'d the 10 → roster **10 down → 0**, 100% healthy. `project-strategist` is on-demand (only ever `compose run`), left as-is — NOT a daemon.
+
+### 2c. Zustand "deprecation" — PHANTOM, closed ✅ (commit `563e0d4`)
+- No file anywhere uses the deprecated default `import create from 'zustand'`; Course + V2.4 dashboard already use named `{ create }`. MC had `zustand` as a **dead dependency** (never imported) → removed it + CHANGELOG `[0.9.1]`.
+
 ### 3. Full ecosystem health check — DONE ✅
 
 | Service | Status |
