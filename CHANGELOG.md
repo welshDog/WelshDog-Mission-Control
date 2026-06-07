@@ -4,6 +4,14 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.10.3] — 2026-06-08
+
+### Added — **`commit` field on `GET /api/health`**
+Server-internal changes (e.g. the 0.10.2 `mission_type` fixes) had no
+externally observable deploy signal — the MC API has no `/api/version`. Health
+now returns `commit` (Render's injected `RENDER_GIT_COMMIT`, falling back to
+`GIT_COMMIT`, then `'dev'` locally) so any build can be verified from outside.
+
 ## [0.10.2] — 2026-06-07
 
 ### Fixed — **Remaining `mc_missions.mission_type` NOT-NULL inserts (audit cards)**
