@@ -249,6 +249,7 @@ export const snoozeStraggler = async (userId, hours = 24) => {
     {
       title: `Straggler snoozed · ${userId.slice(0, 8)}…`,
       signal_source: `catch_stragglers:snoozed:${userId}`,
+      mission_type: 'straggler',
       lane: 'detected',
       notes: `Snoozed until ${until} by operator (24h cool-down on the UI list).`,
     },

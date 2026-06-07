@@ -4,6 +4,23 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.10.2] — 2026-06-07
+
+### Fixed — **Remaining `mc_missions.mission_type` NOT-NULL inserts (audit cards)**
+Closes the follow-up flagged in 0.10.1. The same `mission_type` NOT-NULL bug
+silently broke every server-side audit-card insert (the `mc_events` rows still
+landed, so the actions "worked" but no Kanban card appeared). All now set a
+semantic `mission_type`:
+
+- `server/index.js` — **send-dm** → `'straggler'`, **grant-tokens** →
+  `'grant_tokens'`, **refund** → `'refund'`.
+- `src/lib/supabase.js` — **`snoozeStraggler`** → `'straggler'`.
+
+Verified with a transactional dry-run covering all three server shapes
+(including `lane: 'investigating'` + `priority: 'p0'` on the refund failure
+path). CHANGELOG line 107's "every protected mutation writes mc_missions" is
+now actually true again.
+
 ## [0.10.1] — 2026-06-07
 
 ### Fixed — **Health Pulse schema errors (mc_missions + user_level_progress)**

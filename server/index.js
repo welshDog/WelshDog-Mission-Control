@@ -359,6 +359,7 @@ app.post('/api/send-dm', requireAdmin, async (req, res) => {
             ? `Straggler DM sent · ${userId.slice(0, 8)}…`
             : `Straggler DM logged (email) · ${userId.slice(0, 8)}…`,
         signal_source: userSignal,
+        mission_type: 'straggler',
         lane: 'shipped',
         owner: actor,
         notes: noteLines.join('\n'),
@@ -523,6 +524,7 @@ app.post('/api/grant-tokens', requireAdmin, async (req, res) => {
         {
           title: `Granted ${amount} BROski$ · ${userEmail || userId.slice(0, 8) + '…'}`,
           signal_source: `grant_tokens:${idempotencyKey}`,
+          mission_type: 'grant_tokens',
           lane: 'shipped',
           owner: actor,
           priority: amount >= 1000 ? 'p1' : 'p2',
@@ -817,6 +819,7 @@ app.post('/api/refund', requireAdmin, async (req, res) => {
           ? `Refund landed BUT token deduction FAILED · ${paymentIntentId.slice(0, 12)}…`
           : `Refunded ${refund.amount} ${refund.currency} · ${user.email || paymentIntentId.slice(0, 12) + '…'}`,
         signal_source: `refund:${idempotencyKey}`,
+        mission_type: 'refund',
         lane: tokenDeductionError ? 'investigating' : 'shipped',
         owner: actor,
         priority: tokenDeductionError ? 'p0' : (refund.amount >= 5000 ? 'p1' : 'p2'),
