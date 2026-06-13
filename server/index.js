@@ -43,6 +43,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { Counter, register } from 'prom-client'
 
 dotenv.config({ path: '.env.local' })
 dotenv.config() // fall back to .env
@@ -79,6 +80,16 @@ const MAX_GRANT_PER_CALL = Number(process.env.MAX_GRANT_PER_CALL) || 10000
 
 // UUID v4 shape check (cheap pre-validation before we hit the DB).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+// Prometheus counters — DM observability (LIVE-MATRIX: Discord DM Observability)
+const dmSendAttemptTotal = new Counter({
+  name: 'dm_send_attempt_total',
+  help: 'Total DM send attempts via /api/send-dm (after rate-limit passes)',
+})
+const dmSendFailureTotal = new Counter({
+  name: 'dm_send_failure_total',
+  help: 'Total DM send failures via /api/send-dm (no delivery channel succeeded)',
+})
 
 // Stripe payment_intent shape check + API base.
 const STRIPE_PI_RE = /^pi_[A-Za-z0-9_]+$/
@@ -271,6 +282,8 @@ app.post('/api/send-dm', requireAdmin, async (req, res) => {
     return res.status(429).json({ success: false, userId, error: 'rate_limited', retryAfter })
   }
 
+  dmSendAttemptTotal.inc()
+
   // ── Discord delivery (DM channel → send message). Fall back to ─────
   // email_logged on failure so the operator can chase manually.
   let channel = 'none'
@@ -329,6 +342,7 @@ app.post('/api/send-dm', requireAdmin, async (req, res) => {
   }
 
   if (channel === 'none') {
+    dmSendFailureTotal.inc()
     return res.status(502).json({
       success: false,
       userId,
@@ -867,6 +881,15 @@ app.post('/api/refund', requireAdmin, async (req, res) => {
     tokenDeductionError,
     idempotencyKey,
   })
+})
+
+// ── /metrics ─────────────────────────────────────────────────────────
+// Prometheus scrape target. Exposes dm_send_attempt_total +
+// dm_send_failure_total (and prom-client default process metrics).
+// No auth — Prometheus scrapes this from within the network.
+app.get('/metrics', async (_req, res) => {
+  res.set('Content-Type', register.contentType)
+  res.end(await register.metrics())
 })
 
 // ── Boot ──────────────────────────────────────────────────────────────

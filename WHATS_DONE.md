@@ -2,9 +2,18 @@
 
 > Single source of truth. Never suggest rebuilding anything listed here.
 > Full prose history lives in `CHANGELOG.md` — this file is the operator's
-> at-a-glance cheat sheet. Updated 2026-06-07.
+> at-a-glance cheat sheet. Updated 2026-06-14.
 
 ---
+
+## v0.10.4 — June 14, 2026 — Catch Stragglers Prometheus counters
+- `prom-client` added as a production dependency (`^15.1.3`).
+- Two Prometheus counters wired into `POST /api/send-dm`:
+  - `dm_send_attempt_total` — increments after rate-limit passes (actual delivery attempt)
+  - `dm_send_failure_total` — increments on 502 (no Discord + no email channel)
+- `GET /metrics` endpoint added (unauthenticated, Prometheus-scrape-safe).
+- LIVE-MATRIX: Discord DM Observability row moves from 🔴 MISSING to 🟢 LIVE.
+- Smoke test pending: Bro must add `DISCORD_BOT_TOKEN` to Render env, then test send-dm with 1 real discordId.
 
 ## v0.9.0 — May 25, 2026 — ActivityTicker v2 (mc_events realtime)
 - `ActivityTicker.jsx` rewritten to read `mc_events` directly (realtime INSERT subscription on the v0.5.0 publication).
