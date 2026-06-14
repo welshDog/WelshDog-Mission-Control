@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Stethoscope, Sunrise, UserCheck, Coins, Undo2, ScanSearch, Loader, X } from 'lucide-react'
-import { runHealthPulse, runMorningBrief, recordActivity } from '../../lib/supabase'
+import { runHealthPulse, runMorningBrief, runDriftScan, recordActivity } from '../../lib/supabase'
 import GrantTokens from './GrantTokens'
 import Refund from './Refund'
 
@@ -20,7 +20,7 @@ const ACTIONS = [
   { id: 'stragglers', label: 'Catch Stragglers', Icon: UserCheck,   desc: 'Find idle students · draft DMs you approve · send',     enabled: true  },
   { id: 'grant',      label: 'Grant Tokens',     Icon: Coins,       desc: 'Pick user + amount + reason → award_tokens() w/ audit', enabled: true  },
   { id: 'refund',     label: 'Refund',           Icon: Undo2,       desc: 'Stripe + token refund in one click (reversible)',       enabled: true  },
-  { id: 'drift',      label: 'Drift Scan',       Icon: ScanSearch,  desc: 'Re-run quiz true/false positional scan',                 enabled: false },
+  { id: 'drift',      label: 'Drift Scan',       Icon: ScanSearch,  desc: 'Re-run quiz true/false positional scan',                 enabled: true  },
 ]
 
 const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
@@ -68,6 +68,14 @@ const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
         recordActivity('brief', {
           rowCount: out.rows.length,
           skipped: out.skipped.length,
+        })
+      } else if (id === 'drift') {
+        const out = await runDriftScan()
+        setResult({ id, payload: out })
+        recordActivity('drift', {
+          totalModules: out.totalModules,
+          totalTrueFalse: out.totalTrueFalse,
+          issueCount: out.issues.length,
         })
       }
     } catch (e) {
@@ -130,7 +138,11 @@ const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
             >
               <div className="flex items-start justify-between mb-4">
                 <h3 className="text-base font-bold text-white">
-                  {error ? 'Action failed' : result?.id === 'pulse' ? '🩺 Health Pulse complete' : '☀️ Morning Brief'}
+                  {error ? 'Action failed'
+                    : result?.id === 'pulse' ? '🩺 Health Pulse complete'
+                    : result?.id === 'brief' ? '☀️ Morning Brief'
+                    : result?.id === 'drift' ? '🔍 Drift Scan complete'
+                    : 'Result'}
                 </h3>
                 <button
                   onClick={() => { setResult(null); setError(null) }}
@@ -153,6 +165,37 @@ const LIVE_COUNT = ACTIONS.filter((a) => a.enabled).length
                   {result.payload.scanned.length > 0 && (
                     <div className="text-xs text-gray-300">
                       <span className="text-gray-500">Scanned:</span> {result.payload.scanned.join(' · ')}
+                    </div>
+                  )}
+                  {result.payload.skipped.length > 0 && (
+                    <div className="text-xs text-amber-300">
+                      <span className="text-amber-500">Skipped:</span> {result.payload.skipped.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {result?.id === 'drift' && (
+                <div className="space-y-3 text-sm">
+                  <div className="text-xs text-gray-500 font-mono">
+                    {result.payload.totalModules} module{result.payload.totalModules === 1 ? '' : 's'} · {result.payload.totalTrueFalse} true/false question{result.payload.totalTrueFalse === 1 ? '' : 's'} scanned
+                  </div>
+                  {result.payload.clean ? (
+                    <div className="text-green-400 font-bold">✅ All clear — no answer_index drift detected.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-amber-400 font-bold">
+                        ⚠️ {result.payload.issues.length} issue{result.payload.issues.length === 1 ? '' : 's'} found — mission card created
+                      </div>
+                      <ul className="space-y-2 max-h-48 overflow-y-auto">
+                        {result.payload.issues.map((issue, i) => (
+                          <li key={i} className="text-xs border border-amber-500/20 rounded-lg p-2 bg-amber-500/5">
+                            <span className="font-mono text-amber-400">[{issue.moduleCode}] {issue.questionId}</span>
+                            <div className="text-gray-300 mt-0.5 line-clamp-2">{issue.prompt}</div>
+                            <div className="text-amber-300 mt-0.5">{issue.issue}</div>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {result.payload.skipped.length > 0 && (

@@ -225,6 +225,7 @@ app.get('/api/health', (_req, res) => {
 const ACTIVITY_EVENTS = {
   pulse: 'pulse.completed',
   brief: 'brief.completed',
+  drift: 'drift.completed',
 }
 
 app.post('/api/activity', requireAdmin, async (req, res) => {
@@ -239,7 +240,9 @@ app.post('/api/activity', requireAdmin, async (req, res) => {
   const payload =
     kind === 'pulse'
       ? { createdCount: toCount(s.createdCount), scanned: toCount(s.scanned), skipped: toCount(s.skipped) }
-      : { rowCount: toCount(s.rowCount), skipped: toCount(s.skipped) }
+      : kind === 'brief'
+      ? { rowCount: toCount(s.rowCount), skipped: toCount(s.skipped) }
+      : { totalModules: toCount(s.totalModules), totalTrueFalse: toCount(s.totalTrueFalse), issueCount: toCount(s.issueCount) }
 
   await emitEvent({ eventType, actor: req.user?.email || 'unknown', payload })
   return res.json({ success: true, event_type: eventType })

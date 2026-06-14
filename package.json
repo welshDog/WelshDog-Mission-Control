@@ -1,7 +1,7 @@
 {
   "name": "welshdog-mission-control",
   "private": true,
-  "version": "0.10.4",
+  "version": "0.11.0",
   "description": "WelshDog Mission Control — live ops dashboard for WelshDog Designs + the Vibe Coding Course. React + Supabase + Socket.io.",
   "type": "module",
   "scripts": {

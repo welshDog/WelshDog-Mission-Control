@@ -401,6 +401,65 @@ export const runMorningBrief = async () => {
   return { rows, skipped, generatedAt: new Date() }
 }
 
+// 🔍 Drift Scan — re-run the quiz true/false positional scan.
+// Fetches all hv_quizzes rows, walks every true_false question, and
+// checks two things:
+//   1. answer_index is 0 or 1 (never null / out of range)
+//   2. Explanation text agrees with answer_index:
+//      explanation starts with "False" → expected answer_index 1
+//      explanation starts with "True"  → expected answer_index 0
+// Creates an mc_missions card if any issues are found.
+// Returns: { totalModules, totalTrueFalse, issues[], skipped[], clean, scannedAt }
+export const runDriftScan = async () => {
+  const issues = []
+  const skipped = []
+  let totalModules = 0
+  let totalTrueFalse = 0
+
+  try {
+    const { data, error } = await supabase.from('hv_quizzes').select('id, module_id, payload')
+    if (error) throw error
+    totalModules = (data || []).length
+
+    for (const row of data || []) {
+      const moduleCode = row.payload?.module_code || '?'
+      for (const q of row.payload?.questions || []) {
+        if (q.type !== 'true_false') continue
+        totalTrueFalse++
+
+        if (q.answer_index !== 0 && q.answer_index !== 1) {
+          issues.push({ moduleCode, questionId: q.id, prompt: q.prompt, answer_index: q.answer_index, issue: `answer_index ${q.answer_index} is invalid (must be 0=True or 1=False)` })
+          continue
+        }
+
+        const exp = (q.explanation || '').trim().toLowerCase()
+        if (exp.startsWith('false') && q.answer_index !== 1) {
+          issues.push({ moduleCode, questionId: q.id, prompt: q.prompt, answer_index: q.answer_index, issue: `Explanation says "False" but answer_index=${q.answer_index} (expected 1)` })
+        } else if (exp.startsWith('true') && q.answer_index !== 0) {
+          issues.push({ moduleCode, questionId: q.id, prompt: q.prompt, answer_index: q.answer_index, issue: `Explanation says "True" but answer_index=${q.answer_index} (expected 0)` })
+        }
+      }
+    }
+  } catch (e) {
+    skipped.push(`hv_quizzes (${e?.message || 'query failed'})`)
+  }
+
+  if (issues.length > 0) {
+    try {
+      await createMission({
+        title: `⚠️ Quiz drift · ${issues.length} T/F question${issues.length === 1 ? '' : 's'} flagged`,
+        signal_source: 'drift_scan:true_false_mismatch',
+        mission_type: 'drift_scan',
+        notes: issues.map((i) => `[${i.moduleCode}] ${i.questionId}: ${i.issue}`).join('\n'),
+      })
+    } catch (e) {
+      skipped.push(`mc_missions audit (${e?.message || 'insert failed'})`)
+    }
+  }
+
+  return { totalModules, totalTrueFalse, issues, skipped, clean: issues.length === 0, scannedAt: new Date() }
+}
+
 // 📡 Record a completed frontend-run agent action (Health Pulse / Morning
 // Brief) into mc_events — via the MC API, because mc_events INSERT is
 // service-role-only (the browser can't write its own audit row). The
