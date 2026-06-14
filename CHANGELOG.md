@@ -4,6 +4,26 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.10.4] — 2026-06-14
+
+### Added — **Prometheus counters for Discord DM observability**
+Closes the "Discord DM Observability" gap flagged in the 2026-06-13 ecosystem
+audit (LIVE-MATRIX was 🔴 MISSING — now 🟢 LIVE).
+
+- `prom-client ^15.1.3` added as a production dependency.
+- Two counters wired into `POST /api/send-dm`:
+  - `dm_send_attempt_total` — increments after the 24h rate-limit check passes
+    (i.e. only on genuine delivery attempts, not blocked retries).
+  - `dm_send_failure_total` — increments on 502 (Discord failed + no email
+    fallback available).
+- `GET /metrics` scrape endpoint added (unauthenticated; exposes the two DM
+  counters plus prom-client default process metrics). Prometheus can scrape this
+  directly from within the network.
+- **E2E smoke test completed 2026-06-14:** `{ success: true, channel: "discord",
+  messageId: "1515509899868766238" }` — DM delivered to Discord, `mc_missions`
+  audit card written, `mc_events` `straggler.dm_sent` row written, rate limit
+  enforced, `requireAdmin` JWT check passed.
+
 ## [0.10.3] — 2026-06-08
 
 ### Added — **`commit` field on `GET /api/health`**
