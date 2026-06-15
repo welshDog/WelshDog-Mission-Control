@@ -4,6 +4,17 @@ All notable changes to **WelshDog Mission Control** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semver](https://semver.org/).
 
+## [0.11.0] — 2026-06-15
+
+### Added — **Drift Scan (6/6 Agent Actions live)**
+
+Closes the final SOON tile. 6/6 Agent Actions are now live in Mission Control.
+
+- `runDriftScan()` added to `src/lib/supabase.js` — fetches all `hv_quizzes` rows, walks every `true_false` question, checks `answer_index` is 0 or 1, and cross-checks explanation text agrees with the index (`"False" → 1`, `"True" → 0`). Creates an `mc_missions` card (`mission_type: 'drift_scan'`, `signal_source: 'drift_scan:true_false_mismatch'`) if any issues are found.
+- `AgentActions.jsx` — Drift Scan tile flipped from `enabled: false` to `enabled: true`; result modal renders `totalModules / totalTrueFalse` header + per-issue list (module code, question ID, prompt, issue label) or green "All clear" banner.
+- `server/index.js` `/api/activity` whitelist — `drift` kind already mapped to `'drift.completed'` event.
+- **Verified live 2026-06-15:** 11 modules · 11 true/false questions scanned → "All clear — no answer_index drift detected". `drift.completed` events confirmed in Activity Ticker (09:13 PM, 06:57 PM, 06:55 PM).
+
 ## [0.10.4] — 2026-06-14
 
 ### Added — **Prometheus counters for Discord DM observability**
