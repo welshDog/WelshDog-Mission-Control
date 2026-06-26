@@ -66,7 +66,7 @@ supabase/migrations/20260524000000_mc_events_and_missions_schema_bump.sql
 
 ## 🤖 Agent Actions
 
-The "do behind the scenes" panel. 5/6 live end-to-end.
+The "do behind the scenes" panel. 6/6 live end-to-end.
 
 | Button | Status | What it does |
 |---|---|---|
@@ -75,7 +75,7 @@ The "do behind the scenes" panel. 5/6 live end-to-end.
 | 🤖 **Catch Stragglers** | ✅ live (v0.4.0) | Idle-student finder + tone-tagged DM drafter (you approve before send). Smoke-tested 2026-05-25. |
 | 🎁 **Grant Tokens** | ✅ live (v0.7.0) | Pick user + amount + reason → `award_tokens()` RPC + audit. Idempotent. |
 | 🔁 **Refund** | ✅ live (v0.8.0) | Stripe charge refund + matching BROski$ deduction in one click. Both sides idempotent (Stripe `Idempotency-Key` + `spend_tokens()` `p_source_id`). |
-| 🧹 **Drift Scan** | ⚠️ scaffolded | Re-run the quiz true/false positional scan. Deferred until there's a drift signal to scan against. |
+| 🧹 **Drift Scan** | ✅ live (v0.11.0) | Re-runs the quiz true/false positional scan over `hv_quizzes` (validates `answer_index` ∈ {0,1} + cross-checks explanation text). Flags mismatches as an `mc_missions` card. Verified live 2026-06-15. |
 
 **ADHD pacing:** one new button per commit. Each ships a real working thing.
 

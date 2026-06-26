@@ -133,9 +133,9 @@
 - ActivityTicker v2 (`mc_events` realtime + dedup) — done (v0.9.0).
 - `CatchStragglers.jsx` mounted in `MissionControl.jsx` as `activePanel === 'stragglers'` overlay; trigger lives in `AgentActions.jsx`.
 - `render.yaml` Express deploy blueprint + `vercel.json` API rewrites.
+- `Drift Scan` (6th tile) — built and live (v0.11.0, commit `45625e0`). Re-runs the quiz true/false positional scan over `hv_quizzes` (`runDriftScan()` in `src/lib/supabase.js`); flags mismatches as an `mc_missions` card. Verified live 2026-06-15.
 
-## Open gaps (only `Drift Scan` remains in the Agent Actions grid)
-- `Drift Scan` (6th tile) — SOON; re-runs the May 18 quiz true/false positional scan against current data. Defer until there's a drift signal to scan against.
+## Open gaps (Agent Actions grid complete — 6/6 live)
 - Health Pulse + Morning Brief still poll-based — not yet `mc_events` emitters. Adding `pulse.completed` / `brief.completed` event types would let `ActivityTicker` show them too (currently filtered out as state-table noise).
 - Email fallback channel logs only (`email_logged`); real send wires when SMTP is picked.
 - Vercel (SPA) + Render (Express) prod env vars need to stay in sync — see commits since v0.9.0 for the deploy plumbing.
