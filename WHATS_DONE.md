@@ -2,7 +2,54 @@
 
 > Single source of truth. Never suggest rebuilding anything listed here.
 > Full prose history lives in `CHANGELOG.md` — this file is the operator's
-> at-a-glance cheat sheet. Updated 2026-06-14.
+> at-a-glance cheat sheet. Updated 2026-07-18.
+
+---
+
+## 🔴 2026-07-18 — SUPABASE PROJECT DELETED (read this first)
+
+Project **`yhtmuibgdnxhbgboajhc` no longer exists.** Everything below that touches
+Supabase is *built* but currently *not running* until MC is repointed at the
+**Hyper Vibe Coding Course** project.
+
+**Gone, unrecoverable:** all `mc_missions` cards + all `mc_events` audit rows.
+Immutability triggers protect rows from edits, not from project deletion.
+
+**Intact:** the schema. Both migrations are in `supabase/migrations/` and rebuild
+in two `apply_migration` calls — the payoff of never using `supabase db push`.
+
+**Unaffected:** `EcosystemHealth` (v0.12.0) — reads a static JSON file, makes no
+Supabase call, kept working right through the outage.
+
+➡️ **Recovery runbook is in `README.md`.** Do not build new features until step 7
+(smoke test) passes.
+
+---
+
+## v0.12.0 — July 18, 2026 — Ecosystem Health panel ("see all, know all")
+- `src/components/mission/EcosystemHealth.jsx` — 26-repo triage panel, mounted
+  **above** `AgentActions` in `MissionControl.jsx` ("what needs me?" before
+  "what can I do?").
+- `src/lib/ecosystem.js` — `assess()` / `summarise()` / `mapAgeDays()` /
+  `loadEcosystem()`. Pure functions, no framework coupling, no network except one
+  `fetch` of a static file.
+- Reads `public/ecosystem-map.json`, generated at the HperCore root by
+  `scripts/gen_repo_map.py` — **the same file that generates `AGENT-START.md` §2**,
+  so the boot file and the dashboard cannot disagree.
+- `scripts/sync-ecosystem.mjs` + `npm run sync:ecosystem` — regenerates at the
+  root then copies into `public/`. Root from `HYPERCORE_ROOT`, default
+  `H:\HYPERFOCUSZONE\HperCore`.
+- Triage thresholds: `LIVE` cold >30d = risk · `BUILDING` quiet >21d = warn ·
+  no manifest = warn · non-git / no commits = warn · **`PARKED`/`RETIRED` = muted,
+  excluded from scoring, hidden by default.**
+- Also surfaces the 3 hottest repos by 30-day commits, and warns when the map file
+  itself is >7 days old (the dashboard must not lie about its own freshness).
+- `.pill-grey` added to `src/index.css` for muted tiers.
+- Tests: `src/__tests__/ecosystem.test.js` — 18 assertions incl. a regression guard
+  that PARKED can never be flagged no matter how cold.
+- First reading against live data: **17/19 healthy (89%)**, flagged
+  `hyperfocus-constellation` (LIVE, untouched 31d) and `THE-HYPERCODE`
+  (quiet 31d), 7 parked hidden.
 
 ---
 
@@ -104,7 +151,23 @@
 
 ## Current state — Supabase / server / docker
 
-### Supabase (`yhtmuibgdnxhbgboajhc`)
+### Supabase — ⚠️ `yhtmuibgdnxhbgboajhc` DELETED · target is now the Course project `tlavrxiaegbtyfmjfdcz`
+
+**Database policy: one project per _audience_, not per _app_.** Supabase projects
+are funds-capped at three:
+
+| Project | Audience | Holds |
+|---|---|---|
+| `jnrkrnzeqeupjumkvobz` | Shop customers | `Hyperfocus-Home-Page` / welshdog.shop |
+| `tlavrxiaegbtyfmjfdcz` | Students + admin ops | Course **+ Mission Control (`mc_` prefix)** |
+| `lmwrfiqmnfuqtocilawd` | Players | `SUPERPOWER-ARCADE` |
+
+MC owns **no project**. It lives in the Course project behind the `mc_` prefix — which
+is exactly why it survives as a design. New features get a prefix, not a project.
+Because that project holds student data *and* the ops spine, `mc_` tables stay
+service-role-write-only (no INSERT policy) as built.
+
+Schema to re-create (both migrations already in `supabase/migrations/`):
 - Tables: `users`, `mc_missions`, `mc_events`.
 - `mc_missions` cols: `id`, `created_at`, `mission_type`, `trigger_source`, `user_id`, `status`, `metadata`, `owner`, `priority`, `signal_source`, `lane`, `title`, `notes`.
 - `mc_events` cols: `id`, `mission_id`, `event_type`, `actor`, `payload`, `created_at` — immutability triggers active, RLS-by-absence-of-INSERT-policy.
@@ -136,6 +199,9 @@
 - `Drift Scan` (6th tile) — built and live (v0.11.0, commit `45625e0`). Re-runs the quiz true/false positional scan over `hv_quizzes` (`runDriftScan()` in `src/lib/supabase.js`); flags mismatches as an `mc_missions` card. Verified live 2026-06-15.
 
 ## Open gaps (Agent Actions grid complete — 6/6 live)
+- 🔴 **Repoint to the Course project** — blocks everything server-side. Runbook in `README.md`.
+- `tlavrxiaegbtyfmjfdcz` placeholder still to be replaced in `README.md` + this file once the ref is confirmed from the Supabase dashboard.
+- Render + Vercel prod env vars need the new ref too — prod stays down until both are updated.
 - Health Pulse + Morning Brief still poll-based — not yet `mc_events` emitters. Adding `pulse.completed` / `brief.completed` event types would let `ActivityTicker` show them too (currently filtered out as state-table noise).
 - Email fallback channel logs only (`email_logged`); real send wires when SMTP is picked.
 - Vercel (SPA) + Render (Express) prod env vars need to stay in sync — see commits since v0.9.0 for the deploy plumbing.
