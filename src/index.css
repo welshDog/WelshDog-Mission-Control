@@ -37,6 +37,8 @@
   .pill-green { @apply px-2 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40; }
   .pill-amber { @apply px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40; }
   .pill-red   { @apply px-2 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-400/40; }
+  /* PARKED / RETIRED — deliberately quiet. Frozen on purpose is not a warning. */
+  .pill-grey  { @apply px-2 py-1 rounded-full text-xs font-bold bg-white/5 text-gray-400 border border-white/10; }
 }
 
 /* Custom Scrollbar */

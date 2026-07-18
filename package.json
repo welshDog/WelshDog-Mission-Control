@@ -13,7 +13,8 @@
     "lint": "eslint src --ext .js,.jsx",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\"",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "sync:ecosystem": "node scripts/sync-ecosystem.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

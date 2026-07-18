@@ -6,6 +6,7 @@ import MissionsKanban from '../components/mission/MissionsKanban'
 import AgentActions from '../components/mission/AgentActions'
 import ActivityTicker from '../components/mission/ActivityTicker'
 import CatchStragglers from '../components/mission/CatchStragglers'
+import EcosystemHealth from '../components/mission/EcosystemHealth'
 
 // MissionControl — the course-ops shell.
 // Top bar (live clock + health pill) → Agent Actions strip → Missions
@@ -103,7 +104,10 @@ export default function MissionControl() {
       {/* ── MAIN + RIGHT SIDEBAR ────────────────────────────────────────── */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
         <main className="space-y-6">
-          {/* Agents up top — most prominent slot */}
+          {/* Ecosystem first — "what needs me right now?" before "what can I do?" */}
+          <EcosystemHealth />
+
+          {/* Agents next — most prominent action slot */}
           <AgentActions setActivePanel={setActivePanel} />
 
           {/* Missions Kanban — the closed-loop board */}
