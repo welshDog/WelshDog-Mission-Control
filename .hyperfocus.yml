@@ -1,0 +1,12 @@
+# HyperFocus Z0ne repo manifest - read by scripts/gen_repo_map.py
+# Edit this file, then re-run the generator. Never hand-edit the map.
+
+name: "WelshDog-Mission-Control"
+emoji: "🛸"
+tagline: "Course-ops dashboard — Kanban + Agent Actions + Discord DM relay + Stripe refund"
+category: "products"
+stack: "Vite + React + Express"
+first_doc: "WHATS_DONE.md"
+tier: "BUILDING"
+url: ""
+notes: "NOT an agent orchestrator; no CLAUDE.md exists"
