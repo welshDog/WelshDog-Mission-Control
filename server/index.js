@@ -49,6 +49,7 @@ import { Counter, register } from 'prom-client'
 import { rankMoves } from '../src/lib/nextMove.js'
 import { createCooBriefClient } from './cooBrief.js'
 import { createRateLimiter } from './rateLimit.js'
+import { createMetricsAuth } from './metricsAuth.js'
 
 dotenv.config({ path: '.env.local' })
 dotenv.config() // fall back to .env
@@ -958,8 +959,9 @@ app.get('/api/broski/next-move', requireAdmin, async (req, res) => {
 // ── /metrics ─────────────────────────────────────────────────────────
 // Prometheus scrape target. Exposes dm_send_attempt_total +
 // dm_send_failure_total (and prom-client default process metrics).
-// No auth — Prometheus scrapes this from within the network.
-app.get('/metrics', async (_req, res) => {
+// Requires `Authorization: Bearer $METRICS_TOKEN` (see server/metricsAuth.js).
+// In production with no token set it fails closed (503).
+app.get('/metrics', createMetricsAuth(), async (_req, res) => {
   res.set('Content-Type', register.contentType)
   res.end(await register.metrics())
 })
