@@ -107,6 +107,8 @@ export default function CatchStragglers({ onClose }) {
       } else if (out.error === 'rate_limited') {
         const hours = Math.ceil((out.retryAfter || 0) / 3600)
         recordRowError(draft.userId, `Already DM'd in the last 24h — try again in ~${hours}h`)
+      } else if (out.error === 'admin_rate_limited') {
+        recordRowError(draft.userId, `Sending too fast — wait ~${out.retryAfter || 60}s and retry`)
       } else if (out.status === 401 || out.error === 'no_session' || out.error === 'invalid_token' || out.error === 'missing_bearer_token') {
         recordRowError(draft.userId, 'Session expired — sign out and back in, then retry')
       } else if (out.status === 403 || out.error === 'forbidden_not_admin') {

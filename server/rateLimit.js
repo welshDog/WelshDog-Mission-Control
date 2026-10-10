@@ -6,7 +6,7 @@
 // Mount AFTER requireAdmin so `req.user.id` exists. Falls back to req.ip so a
 // mis-ordered mount still limits something rather than failing open.
 
-export function createRateLimiter({ limit, windowMs, name = 'rate', now = Date.now }) {
+export function createRateLimiter({ limit, windowMs, name = 'rate', errorCode = 'rate_limited', now = Date.now }) {
   const hits = new Map()
 
   return function rateLimit(req, res, next) {
@@ -21,8 +21,9 @@ export function createRateLimiter({ limit, windowMs, name = 'rate', now = Date.n
       res.set('Retry-After', String(retryAfter))
       return res.status(429).json({
         success: false,
-        error: 'rate_limited',
+        error: errorCode,
         scope: name,
+        retryAfter,
         retryAfterSeconds: retryAfter,
       })
     }

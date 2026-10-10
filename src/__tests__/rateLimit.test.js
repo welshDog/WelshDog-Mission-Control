@@ -53,4 +53,12 @@ describe('createRateLimiter', () => {
     t = 1001
     expect(call(rl, 'a').next).toHaveBeenCalled()
   })
+
+  it('uses a custom error code and exposes retryAfter for the UI', () => {
+    const rl = createRateLimiter({ limit: 1, windowMs: 30_000, errorCode: 'admin_rate_limited', now: () => 0 })
+    call(rl, 'a')
+    const { res } = call(rl, 'a')
+    expect(res.body.error).toBe('admin_rate_limited')
+    expect(res.body.retryAfter).toBe(30)
+  })
 })
