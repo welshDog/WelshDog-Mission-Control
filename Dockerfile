@@ -32,6 +32,11 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 # Copy server code and package files
 COPY --chown=nodejs:nodejs server ./server
+# The server also reads these from outside server/ (rankMoves in src/lib, and the
+# ecosystem map served by /api/broski/next-move). Without them the image
+# crashes at boot with ERR_MODULE_NOT_FOUND.
+COPY --chown=nodejs:nodejs src/lib ./src/lib
+COPY --chown=nodejs:nodejs public/ecosystem-map.json ./public/ecosystem-map.json
 COPY --chown=nodejs:nodejs package*.json ./
 
 # Install production dependencies only
