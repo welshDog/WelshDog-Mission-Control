@@ -48,6 +48,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Counter, register } from 'prom-client'
 import { rankMoves } from '../src/lib/nextMove.js'
 import { createCooBriefClient } from './cooBrief.js'
+import { createRateLimiter } from './rateLimit.js'
 
 dotenv.config({ path: '.env.local' })
 dotenv.config() // fall back to .env
@@ -615,6 +616,20 @@ const stripeFetch = async (path, { method = 'GET', body = null, idempotencyKey =
   return { status: res.status, ok: res.ok, payload }
 }
 
+// Refunds move real money: cap how fast any one admin can hit them.
+// Commit is tight (a stolen token can't drain quickly); preview is looser
+// because operators legitimately look up several payments in a row.
+const refundPreviewLimit = createRateLimiter({
+  name: 'refund_preview',
+  limit: Number(process.env.REFUND_PREVIEW_MAX_PER_MIN) || 30,
+  windowMs: 60 * 1000,
+})
+const refundCommitLimit = createRateLimiter({
+  name: 'refund',
+  limit: Number(process.env.REFUND_MAX_PER_10MIN) || 5,
+  windowMs: 10 * 60 * 1000,
+})
+
 // ── /api/refund/preview ───────────────────────────────────────────────
 // Admin-only. Body: { paymentIntentId }
 // Returns: enough state for the operator to make an informed Confirm:
@@ -623,7 +638,7 @@ const stripeFetch = async (path, { method = 'GET', body = null, idempotencyKey =
 //   - The token_transactions row that originally awarded tokens for this PI
 //   - The user's current broski_tokens balance
 //   - canRefund flag + blocker string when something pre-empts
-app.post('/api/refund/preview', requireAdmin, async (req, res) => {
+app.post('/api/refund/preview', requireAdmin, refundPreviewLimit, async (req, res) => {
   const { paymentIntentId } = req.body || {}
   if (!paymentIntentId || typeof paymentIntentId !== 'string' || !STRIPE_PI_RE.test(paymentIntentId)) {
     return res.status(400).json({ success: false, error: 'paymentIntentId_must_be_pi_format' })
@@ -742,7 +757,7 @@ app.post('/api/refund/preview', requireAdmin, async (req, res) => {
 // Audit:
 //   - mc_missions card (shipped lane, owner = actor, priority based on amount)
 //   - mc_events row — `refund.issued` (clean) / `refund.token_deduction_failed`
-app.post('/api/refund', requireAdmin, async (req, res) => {
+app.post('/api/refund', requireAdmin, refundCommitLimit, async (req, res) => {
   const { paymentIntentId } = req.body || {}
   const idempotencyKey =
     typeof req.body?.idempotencyKey === 'string' && req.body.idempotencyKey.length > 0
