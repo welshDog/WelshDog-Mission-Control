@@ -253,12 +253,25 @@ app.post('/api/activity', requireAdmin, async (req, res) => {
   return res.json({ success: true, event_type: eventType })
 })
 
+// ── Per-admin rate limits (see server/rateLimit.js) ─────────────────
+// Money-moving routes are tight so a stolen admin token can't drain quickly;
+// previews are looser because operators look up several items in a row.
+// send-dm sits well above Catch Stragglers' bulk batch (20 drafts) and uses a
+// distinct error code so the UI doesn't confuse it with the 24h per-user rule.
+const mkLimit = (name, envKey, dflt, windowMs, errorCode) =>
+  createRateLimiter({ name, limit: Number(process.env[envKey]) || dflt, windowMs, errorCode })
+const refundPreviewLimit = mkLimit('refund_preview', 'REFUND_PREVIEW_MAX_PER_MIN', 30, 60 * 1000)
+const refundCommitLimit = mkLimit('refund', 'REFUND_MAX_PER_10MIN', 5, 10 * 60 * 1000)
+const grantPreviewLimit = mkLimit('grant_preview', 'GRANT_PREVIEW_MAX_PER_MIN', 30, 60 * 1000)
+const grantCommitLimit = mkLimit('grant', 'GRANT_MAX_PER_10MIN', 10, 10 * 60 * 1000)
+const sendDmLimit = mkLimit('send_dm', 'SEND_DM_MAX_PER_10MIN', 40, 10 * 60 * 1000, 'admin_rate_limited')
+
 // ── /api/send-dm ──────────────────────────────────────────────────────
 // Admin-only. Body: { userId, discordId?, email?, message, tone? }
 // Returns: { success: true,  userId, channel, messageId? }
 //          { success: false, userId, error, retryAfter? }
 //   401 = missing/invalid Bearer JWT · 403 = authenticated but not admin
-app.post('/api/send-dm', requireAdmin, async (req, res) => {
+app.post('/api/send-dm', requireAdmin, sendDmLimit, async (req, res) => {
   const { userId, discordId, email, message, tone } = req.body || {}
 
   if (!userId || !message) {
@@ -427,7 +440,7 @@ app.post('/api/send-dm', requireAdmin, async (req, res) => {
 // resolves to a real user and surface current balance. Cheap read,
 // no side effects, no audit row (a preview that didn't run shouldn't
 // pollute the audit log).
-app.post('/api/grant-tokens/preview', requireAdmin, async (req, res) => {
+app.post('/api/grant-tokens/preview', requireAdmin, grantPreviewLimit, async (req, res) => {
   const { userId } = req.body || {}
   if (!userId || typeof userId !== 'string' || !UUID_RE.test(userId)) {
     return res.status(400).json({ success: false, error: 'userId_must_be_uuid' })
@@ -470,7 +483,7 @@ app.post('/api/grant-tokens/preview', requireAdmin, async (req, res) => {
 // shipped-lane card the operator can see on the Kanban). Both writes
 // are best-effort — if either fails after the grant landed, we log and
 // still return success so the operator's UI moves on.
-app.post('/api/grant-tokens', requireAdmin, async (req, res) => {
+app.post('/api/grant-tokens', requireAdmin, grantCommitLimit, async (req, res) => {
   const { userId, amount, reason } = req.body || {}
   const idempotencyKey =
     typeof req.body?.idempotencyKey === 'string' && req.body.idempotencyKey.length > 0
@@ -615,20 +628,6 @@ const stripeFetch = async (path, { method = 'GET', body = null, idempotencyKey =
   const payload = await res.json().catch(() => ({}))
   return { status: res.status, ok: res.ok, payload }
 }
-
-// Refunds move real money: cap how fast any one admin can hit them.
-// Commit is tight (a stolen token can't drain quickly); preview is looser
-// because operators legitimately look up several payments in a row.
-const refundPreviewLimit = createRateLimiter({
-  name: 'refund_preview',
-  limit: Number(process.env.REFUND_PREVIEW_MAX_PER_MIN) || 30,
-  windowMs: 60 * 1000,
-})
-const refundCommitLimit = createRateLimiter({
-  name: 'refund',
-  limit: Number(process.env.REFUND_MAX_PER_10MIN) || 5,
-  windowMs: 10 * 60 * 1000,
-})
 
 // ── /api/refund/preview ───────────────────────────────────────────────
 // Admin-only. Body: { paymentIntentId }
