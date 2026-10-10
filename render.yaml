@@ -79,6 +79,12 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
 
+      # Bearer token Prometheus must send to scrape /metrics. Render generates
+      # it; read it from the dashboard and put it in the scrape config
+      # (authorization.credentials). Unset in production = /metrics returns 503.
+      - key: METRICS_TOKEN
+        generateValue: true
+
       # Grant Tokens hard cap (catches finger-trouble; optional, defaults to 10000).
       - key: MAX_GRANT_PER_CALL
         value: "10000"
